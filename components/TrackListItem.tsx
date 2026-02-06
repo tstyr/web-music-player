@@ -56,7 +56,6 @@ const TrackListItem = React.memo(({
 
   return (
     <div
-      style={style}
       className="p-4 hover:bg-white/5 cursor-pointer group transition-colors border-b border-white/5"
       onClick={() => onTrackClick(track)}
     >

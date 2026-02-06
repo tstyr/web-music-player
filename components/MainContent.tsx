@@ -8,7 +8,7 @@ import UploadZone from './UploadZone';
 import AudioVisualizer from './AudioVisualizer';
 import EditTrackModal from './EditTrackModal';
 import TrackMenu from './TrackMenu';
-import VirtualTrackList from './VirtualTrackList';
+import TrackListItem from './TrackListItem';
 import { useMusicStore } from '@/lib/store';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
@@ -731,18 +731,41 @@ export default function MainContent({
                       </div>
                     </div>
                     
-                    {/* 仮想リストでパフォーマンス最適化 */}
-                    <VirtualTrackList
-                      tracks={tracks}
-                      currentTrack={currentTrack}
-                      isPlaying={isPlaying}
-                      likedSongs={likedSongs}
-                      onTrackClick={handleTrackClick}
-                      onLikeClick={handleLikeClick}
-                      onEditClick={handleEditClick}
-                      onMenuClick={handleTrackMenuOpen}
-                      height={600}
-                    />
+                    {/* 最適化されたトラックリスト */}
+                    <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto gpu-accelerated">
+                      {tracks.map((track, index) => (
+                        <TrackListItem
+                          key={track.id}
+                          track={track}
+                          index={index}
+                          isCurrentTrack={currentTrack?.id === track.id}
+                          isPlaying={isPlaying}
+                          isLiked={likedSongs.includes(track.id)}
+                          onTrackClick={handleTrackClick}
+                          onLikeClick={handleLikeClick}
+                          onEditClick={handleEditClick}
+                          onMenuClick={handleTrackMenuOpen}
+                          formatDuration={(seconds: number) => {
+                            const mins = Math.floor(seconds / 60);
+                            const secs = seconds % 60;
+                            return `${mins}:${secs.toString().padStart(2, '0')}`;
+                          }}
+                          formatFileSize={(bytes?: number) => {
+                            if (!bytes) return '';
+                            const sizes = ['B', 'KB', 'MB', 'GB'];
+                            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                            return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+                          }}
+                          getQualityColor={(quality?: string) => {
+                            if (!quality) return 'text-gray-400';
+                            if (quality.includes('Hi-Res')) return 'text-purple-400';
+                            if (quality.includes('Studio')) return 'text-blue-400';
+                            if (quality.includes('CD')) return 'text-green-400';
+                            return 'text-gray-400';
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
