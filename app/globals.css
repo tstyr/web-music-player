@@ -210,6 +210,14 @@ a:not(.no-min-size) {
   -webkit-backface-visibility: hidden;
   perspective: 1000px;
   -webkit-perspective: 1000px;
+  will-change: transform;
+}
+
+/* トラック行の最適化 */
+.track-item {
+  contain: layout style paint;
+  content-visibility: auto;
+  will-change: background-color;
 }
 
 /* スクロール中のアニメーション無効化 */

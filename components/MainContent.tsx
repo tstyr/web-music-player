@@ -9,6 +9,7 @@ import AudioVisualizer from './AudioVisualizer';
 import EditTrackModal from './EditTrackModal';
 import TrackMenu from './TrackMenu';
 import TrackListItem from './TrackListItem';
+import SkeletonLoader from './SkeletonLoader';
 import { useMusicStore } from '@/lib/store';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
@@ -534,11 +535,9 @@ export default function MainContent({
       </div>
 
       {/* コンテンツエリア - 画面いっぱいまで表示 */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gradient-to-b from-transparent to-black/20 min-h-0 gpu-accelerated">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-gradient-to-b from-transparent to-black/20 min-h-0 flex flex-col">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-          </div>
+          <SkeletonLoader count={15} />
         ) : (
           <>
             {currentView === 'home' && (
@@ -697,8 +696,8 @@ export default function MainContent({
             )}
 
             {(currentView === 'library' || currentView === 'search') && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
+              <div className="space-y-6 flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between flex-shrink-0">
                   <h2 className="text-xl font-semibold">
                     {searchQuery ? `Search results for "${searchQuery}"` : 'Your Music'}
                   </h2>
@@ -719,8 +718,8 @@ export default function MainContent({
                     </p>
                   </div>
                 ) : (
-                  <div className="glass rounded-xl overflow-hidden">
-                    <div className="p-4 border-b border-white/10">
+                  <div className="glass rounded-xl overflow-hidden flex flex-col flex-1 min-h-0">
+                    <div className="p-4 border-b border-white/10 flex-shrink-0">
                       <div className="grid grid-cols-12 gap-4 text-sm text-gray-400 font-medium">
                         <div className="col-span-1">#</div>
                         <div className="col-span-4">TITLE</div>
@@ -731,8 +730,8 @@ export default function MainContent({
                       </div>
                     </div>
                     
-                    {/* 最適化されたトラックリスト */}
-                    <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto gpu-accelerated">
+                    {/* 最適化されたトラックリスト - 画面いっぱいまで拡張 */}
+                    <div className="flex-1 overflow-y-auto optimized-scroll bg-gradient-to-b from-transparent to-black/20">
                       {tracks.map((track, index) => (
                         <TrackListItem
                           key={track.id}
