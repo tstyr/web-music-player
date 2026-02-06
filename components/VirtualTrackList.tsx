@@ -2,8 +2,10 @@
 
 import React, { useCallback, useMemo } from 'react';
 // @ts-ignore - react-window type definitions issue
-import { FixedSizeList as List } from 'react-window';
+import ReactWindow from 'react-window';
 import TrackListItem from './TrackListItem';
+
+const { FixedSizeList } = ReactWindow;
 
 interface Track {
   id: string;
@@ -111,7 +113,7 @@ const VirtualTrackList = React.memo(({
   }, [tracks, currentTrack]);
 
   return (
-    <List
+    <FixedSizeList
       height={height}
       itemCount={tracks.length}
       itemSize={80}
@@ -121,7 +123,7 @@ const VirtualTrackList = React.memo(({
       className="scrollbar-thin"
     >
       {Row}
-    </List>
+    </FixedSizeList>
   );
 });
 
