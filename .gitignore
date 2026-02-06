@@ -46,3 +46,7 @@ next-env.d.ts
 # electron
 /dist
 /dist-electron
+
+# cloudflare tunnel
+.cloudflared/
+*-tunnel-credentials.json

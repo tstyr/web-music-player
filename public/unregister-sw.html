@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unregister Service Worker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .status {
+            padding: 20px;
+            margin: 20px 0;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #1db954;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1ed760;
+        }
+        .success {
+            color: #1db954;
+        }
+        .error {
+            color: #ff4757;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Service Worker Management</h1>
+    
+    <div class="status">
+        <h2>Current Status</h2>
+        <p id="status">Checking...</p>
+    </div>
+
+    <button onclick="unregisterAll()">Unregister All Service Workers</button>
+    <button onclick="clearCaches()">Clear All Caches</button>
+    <button onclick="checkStatus()">Refresh Status</button>
+
+    <div class="status">
+        <h2>Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        function log(message, isError = false) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const className = isError ? 'error' : 'success';
+            logDiv.innerHTML += `<p class="${className}">[${time}] ${message}</p>`;
+        }
+
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+            
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                statusDiv.innerHTML = `
+                    <p><strong>Service Workers:</strong> ${registrations.length} registered</p>
+                    ${registrations.map((reg, i) => `
+                        <p>- Registration ${i + 1}: ${reg.scope}</p>
+                    `).join('')}
+                `;
+                
+                const cacheNames = await caches.keys();
+                statusDiv.innerHTML += `
+                    <p><strong>Caches:</strong> ${cacheNames.length} found</p>
+                    ${cacheNames.map(name => `<p>- ${name}</p>`).join('')}
+                `;
+            } else {
+                statusDiv.innerHTML = '<p class="error">Service Worker not supported</p>';
+            }
+        }
+
+        async function unregisterAll() {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                
+                if (registrations.length === 0) {
+                    log('No service workers to unregister');
+                    return;
+                }
+
+                for (const registration of registrations) {
+                    await registration.unregister();
+                    log(`Unregistered: ${registration.scope}`);
+                }
+                
+                log(`✅ Successfully unregistered ${registrations.length} service worker(s)`);
+                await checkStatus();
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+            }
+        }
+
+        async function clearCaches() {
+            try {
+                const cacheNames = await caches.keys();
+                
+                if (cacheNames.length === 0) {
+                    log('No caches to clear');
+                    return;
+                }
+
+                for (const name of cacheNames) {
+                    await caches.delete(name);
+                    log(`Deleted cache: ${name}`);
+                }
+                
+                log(`✅ Successfully cleared ${cacheNames.length} cache(s)`);
+                await checkStatus();
+            } catch (err) {
+                log(`❌ Error: ${err.message}`, true);
+            }
+        }
+
+        // 初期状態をチェック
+        checkStatus();
+    </script>
+</body>
+</html>

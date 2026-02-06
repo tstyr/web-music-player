@@ -56,6 +56,8 @@ interface MusicStore {
   removePlaylist: (playlistId: string) => void;
   toggleLike: (trackId: string) => void;
   playPause: () => void;
+  playNext: () => void;
+  playPrevious: () => void;
   setIsSyncMode: (sync: boolean) => void;
   setConnectedDevices: (count: number) => void;
 }
@@ -113,6 +115,32 @@ export const useMusicStore = create<MusicStore>((set) => ({
   }),
   
   playPause: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  
+  playNext: () => set((state) => {
+    const currentIndex = state.currentPlaylist.findIndex(t => t.id === state.currentTrack?.id);
+    if (currentIndex >= 0 && currentIndex < state.currentPlaylist.length - 1) {
+      return {
+        currentTrack: state.currentPlaylist[currentIndex + 1],
+        isPlaying: true,
+        progress: 0,
+        currentTime: 0
+      };
+    }
+    return state;
+  }),
+  
+  playPrevious: () => set((state) => {
+    const currentIndex = state.currentPlaylist.findIndex(t => t.id === state.currentTrack?.id);
+    if (currentIndex > 0) {
+      return {
+        currentTrack: state.currentPlaylist[currentIndex - 1],
+        isPlaying: true,
+        progress: 0,
+        currentTime: 0
+      };
+    }
+    return state;
+  }),
   
   setIsSyncMode: (sync) => set({ isSyncMode: sync }),
   setConnectedDevices: (count) => set({ connectedDevices: count }),

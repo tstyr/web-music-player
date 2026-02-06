@@ -49,6 +49,8 @@ export default function PlayerBar({
     setIsMuted,
     setIsFullscreenPlayer,
     playPause,
+    playNext,
+    playPrevious,
     toggleLike
   } = useMusicStore();
   const [localProgress, setLocalProgress] = useState(0);
@@ -59,6 +61,7 @@ export default function PlayerBar({
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const [isTrackMenuOpen, setIsTrackMenuOpen] = useState(false);
   const [trackMenuPosition, setTrackMenuPosition] = useState({ x: 0, y: 0 });
+  const [isBuffering, setIsBuffering] = useState(false);
   const [audioFormat, setAudioFormat] = useState({
     source: 'No audio',
     output: 'No audio',
@@ -171,6 +174,111 @@ export default function PlayerBar({
     setIsTrackMenuOpen(true);
   };
 
+  // Media Session API の設定
+  useEffect(() => {
+    if (!currentTrack || typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    try {
+      // メタデータを設定
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title || 'Unknown Track',
+        artist: currentTrack.artist || 'Unknown Artist',
+        album: currentTrack.album || 'Unknown Album',
+        artwork: currentTrack.artwork ? [
+          { src: currentTrack.artwork, sizes: '96x96', type: 'image/jpeg' },
+          { src: currentTrack.artwork, sizes: '128x128', type: 'image/jpeg' },
+          { src: currentTrack.artwork, sizes: '192x192', type: 'image/jpeg' },
+          { src: currentTrack.artwork, sizes: '256x256', type: 'image/jpeg' },
+          { src: currentTrack.artwork, sizes: '384x384', type: 'image/jpeg' },
+          { src: currentTrack.artwork, sizes: '512x512', type: 'image/jpeg' },
+        ] : []
+      });
+
+      // 再生状態を設定
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+      // アクションハンドラーを設定
+      navigator.mediaSession.setActionHandler('play', () => {
+        console.log('Media Session: Play');
+        playPause();
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        console.log('Media Session: Pause');
+        playPause();
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        console.log('Media Session: Previous track');
+        playPrevious();
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        console.log('Media Session: Next track');
+        playNext();
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const audio = audioRef.current;
+        if (audio) {
+          const skipTime = details.seekOffset || 10;
+          audio.currentTime = Math.max(audio.currentTime - skipTime, 0);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const audio = audioRef.current;
+        if (audio && currentTrack) {
+          const skipTime = details.seekOffset || 10;
+          audio.currentTime = Math.min(audio.currentTime + skipTime, currentTrack.duration);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        const audio = audioRef.current;
+        if (audio && details.seekTime !== undefined) {
+          audio.currentTime = details.seekTime;
+        }
+      });
+
+      // 位置情報を更新
+      if (currentTrack.duration > 0) {
+        navigator.mediaSession.setPositionState({
+          duration: currentTrack.duration,
+          playbackRate: 1.0,
+          position: audioRef.current?.currentTime || 0
+        });
+      }
+
+      console.log('Media Session API initialized');
+    } catch (error) {
+      console.error('Media Session API error:', error);
+    }
+  }, [currentTrack, isPlaying]);
+
+  // 再生位置の更新
+  useEffect(() => {
+    if (!currentTrack || typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    const updatePositionState = () => {
+      const audio = audioRef.current;
+      if (audio && currentTrack.duration > 0 && !isNaN(audio.currentTime)) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: currentTrack.duration,
+            playbackRate: audio.playbackRate,
+            position: audio.currentTime
+          });
+        } catch (error) {
+          // エラーは無視（一部のブラウザでは未対応）
+        }
+      }
+    };
+
+    const intervalId = setInterval(updatePositionState, 1000);
+    return () => clearInterval(intervalId);
+  }, [currentTrack]);
+
   // Web Audio API の初期化
   useEffect(() => {
     const audio = audioRef.current;
@@ -219,21 +327,26 @@ export default function PlayerBar({
       return;
     }
     
-    // ファイルパスを正規化してエンコード
-    const normalizedPath = currentTrack.filePath.normalize('NFC');
+    // ファイルパスを正規化
+    let normalizedPath = currentTrack.filePath.normalize('NFC');
     
-    // 絶対パスの場合
-    if (normalizedPath.startsWith('C:') || normalizedPath.startsWith('/')) {
-      // パスの各部分を個別にエンコード（スラッシュは保持）
-      const pathParts = normalizedPath.split(/[/\\]/).filter(p => p);
-      const encodedParts = pathParts.map(part => encodeURIComponent(part));
-      streamUrl = `/api/music/stream/${encodedParts.join('/')}`;
-    } else {
-      // 相対パスの場合
-      const pathParts = normalizedPath.split(/[/\\]/).filter(p => p);
-      const encodedParts = pathParts.map(part => encodeURIComponent(part));
-      streamUrl = `/api/music/stream/${encodedParts.join('/')}`;
+    // 絶対パスの場合は相対パスに変換
+    if (normalizedPath.includes('uploads\\music') || normalizedPath.includes('uploads/music')) {
+      // uploads/music 以降のパスを抽出
+      const musicIndex = normalizedPath.indexOf('uploads');
+      if (musicIndex !== -1) {
+        normalizedPath = normalizedPath.substring(musicIndex);
+        // バックスラッシュをスラッシュに変換
+        normalizedPath = normalizedPath.replace(/\\/g, '/');
+        // uploads/music/ の部分を削除（ファイル名のみにする）
+        normalizedPath = normalizedPath.replace(/^uploads\/music\//, '');
+      }
     }
+    
+    // パスの各部分を個別にエンコード
+    const pathParts = normalizedPath.split('/').filter(p => p);
+    const encodedParts = pathParts.map(part => encodeURIComponent(part));
+    streamUrl = `/api/music/stream/${encodedParts.join('/')}`;
     
     console.log('[PlayerBar] Setting audio source:', {
       original: currentTrack.filePath,
@@ -366,10 +479,22 @@ export default function PlayerBar({
         duration: audio.duration,
         src: audio.src
       });
+      
+      // Durationが正しく取得できたら、Zustandストアを更新
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        // currentTrackのdurationを更新（必要に応じて）
+        console.log('Valid duration detected:', audio.duration);
+      }
     };
 
     const handleCanPlay = () => {
       console.log('Audio can play');
+      setIsBuffering(false);
+    };
+
+    const handleWaiting = () => {
+      console.log('Audio waiting (buffering)');
+      setIsBuffering(true);
     };
 
     const handleError = (e: Event) => {
@@ -388,6 +513,7 @@ export default function PlayerBar({
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('waiting', handleWaiting);
     audio.addEventListener('error', handleError);
 
     // 再生中の場合はアニメーションを開始
@@ -402,6 +528,7 @@ export default function PlayerBar({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('waiting', handleWaiting);
       audio.removeEventListener('error', handleError);
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -418,11 +545,11 @@ export default function PlayerBar({
   }
 
   return (
-    <div className="h-20 glass-dark border-t border-white/10 px-4 flex items-center justify-between">
+    <div className="h-16 sm:h-20 glass-dark border-t border-white/10 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
       {/* 現在の曲情報 */}
-      <div className="flex items-center space-x-4 w-1/4 min-w-0">
+      <div className="flex items-center space-x-2 sm:space-x-4 w-1/4 sm:w-1/4 min-w-0 flex-shrink">
         <motion.div 
-          className="w-14 h-14 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
+          className="w-10 h-10 sm:w-14 sm:h-14 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
           whileHover={{ scale: 1.05 }}
           onClick={() => setIsFullscreenPlayer(true)}
         >
@@ -440,19 +567,19 @@ export default function PlayerBar({
         </motion.div>
         
         <div 
-          className="min-w-0 flex-1 cursor-pointer"
+          className="min-w-0 flex-1 cursor-pointer hidden sm:block"
           onClick={() => setIsFullscreenPlayer(true)}
         >
-          <div className="text-white font-medium truncate hover:underline">
+          <div className="text-white font-medium truncate hover:underline text-sm sm:text-base">
             {currentTrack.title || 'Unknown Track'}
           </div>
-          <div className="text-gray-400 text-sm truncate hover:underline">
+          <div className="text-gray-400 text-xs sm:text-sm truncate hover:underline">
             {currentTrack.artist || 'Unknown Artist'}
           </div>
         </div>
         
         <motion.button
-          className={`${isLiked ? 'text-green-500' : 'text-gray-400'} hover:text-green-400`}
+          className={`${isLiked ? 'text-green-500' : 'text-gray-400'} hover:text-green-400 hidden sm:block`}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={handleLike}
@@ -462,53 +589,57 @@ export default function PlayerBar({
       </div>
 
       {/* プレイヤーコントロール */}
-      <div className="flex flex-col items-center space-y-2 w-1/2 max-w-md">
+      <div className="flex flex-col items-center space-y-1 sm:space-y-2 w-full sm:w-1/2 max-w-md flex-1">
         {/* コントロールボタン */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           <motion.button
             onClick={() => setIsShuffled(!isShuffled)}
-            className={`${isShuffled ? 'text-green-500' : 'text-gray-400'} hover:text-white`}
+            className={`${isShuffled ? 'text-green-500' : 'text-gray-400'} hover:text-white hidden sm:block`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <Shuffle className="w-4 h-4" />
+            <Shuffle className="w-3 h-3 sm:w-4 sm:h-4" />
           </motion.button>
           
           <motion.button
+            onClick={playPrevious}
             className="text-gray-400 hover:text-white"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <SkipBack className="w-5 h-5" />
+            <SkipBack className="w-4 h-4 sm:w-5 sm:h-5" />
           </motion.button>
           
           <motion.button
             onClick={playPause}
-            className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 play-pulse"
+            className="w-8 h-8 sm:w-10 sm:h-10 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 play-pulse relative"
             whileTap={{ scale: 0.95 }}
           >
-            {isPlaying ? (
-              <Pause className="w-5 h-5" />
+            {isBuffering ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
+            ) : isPlaying ? (
+              <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <Play className="w-5 h-5 ml-0.5" />
+              <Play className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
             )}
           </motion.button>
           
           <motion.button
+            onClick={playNext}
             className="text-gray-400 hover:text-white"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <SkipForward className="w-5 h-5" />
+            <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
           </motion.button>
           
           <motion.button
             onClick={() => setRepeatMode((prev) => (prev + 1) % 3)}
-            className={`${repeatMode > 0 ? 'text-green-500' : 'text-gray-400'} hover:text-white relative`}
+            className={`${repeatMode > 0 ? 'text-green-500' : 'text-gray-400'} hover:text-white relative hidden sm:block`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
           >
-            <Repeat className="w-4 h-4" />
+            <Repeat className="w-3 h-3 sm:w-4 sm:h-4" />
             {repeatMode === 2 && (
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
             )}
@@ -516,13 +647,14 @@ export default function PlayerBar({
         </div>
 
         {/* プログレスバー */}
-        <div className="flex items-center space-x-3 w-full">
-          <span className="text-xs text-gray-400 w-10 text-right">
+        <div className="flex items-center space-x-2 sm:space-x-3 w-full">
+          <span className="text-xs text-gray-400 w-8 sm:w-10 text-right">
             {formatTime(audioRef.current?.currentTime || 0)}
           </span>
           
           <Slider.Root
-            className="relative flex items-center select-none touch-none w-full h-5"
+            className="relative flex items-center select-none touch-none w-full h-8 sm:h-5"
+            style={{ touchAction: 'none' }}
             value={[localProgress]}
             onValueChange={handleProgressChange}
             max={100}
@@ -532,21 +664,21 @@ export default function PlayerBar({
               <Slider.Range className="absolute bg-white rounded-full h-full" />
             </Slider.Track>
             <Slider.Thumb
-              className="block w-3 h-3 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white"
+              className="block w-4 h-4 sm:w-3 sm:h-3 bg-white rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-white"
               aria-label="Progress"
             />
           </Slider.Root>
           
-          <span className="text-xs text-gray-400 w-10">
+          <span className="text-xs text-gray-400 w-8 sm:w-10">
             {formatTime(currentTrack?.duration || 0)}
           </span>
         </div>
       </div>
 
       {/* 右側コントロール */}
-      <div className="flex items-center space-x-4 w-1/4 justify-end">
-        {/* オーディオ品質表示 */}
-        <div className="hidden lg:flex flex-col text-xs text-gray-400">
+      <div className="flex items-center space-x-2 sm:space-x-4 w-auto sm:w-1/4 justify-end flex-shrink-0">
+        {/* オーディオ品質表示 - デスクトップのみ */}
+        <div className="hidden xl:flex flex-col text-xs text-gray-400">
           <div className="flex items-center space-x-2">
             <span>Source: {audioFormat.source}</span>
             {currentTrack?.isHighRes && (
@@ -559,26 +691,28 @@ export default function PlayerBar({
           <div className="text-green-400">{audioFormat.format} • {audioFormat.quality}</div>
         </div>
 
-        {/* ビジュアライザー */}
-        <AudioVisualizer 
-          isPlaying={isPlaying} 
-          analyser={analyserRef.current}
-          className="w-16 h-8"
-          barCount={32}
-          height={32}
-          backgroundColor="black"
-          currentTrack={currentTrack}
-          onPlayPause={playPause}
-          progress={localProgress}
-          onProgressChange={handleProgressChange}
-          currentTime={audioRef.current?.currentTime || 0}
-          duration={currentTrack?.duration || 0}
-          volume={localVolume}
-          onVolumeChange={handleVolumeChange}
-        />
+        {/* ビジュアライザー - タブレット以上 */}
+        <div className="hidden md:block">
+          <AudioVisualizer 
+            isPlaying={isPlaying} 
+            analyser={analyserRef.current}
+            className="w-12 h-6 sm:w-16 sm:h-8"
+            barCount={32}
+            height={32}
+            backgroundColor="black"
+            currentTrack={currentTrack}
+            onPlayPause={playPause}
+            progress={localProgress}
+            onProgressChange={handleProgressChange}
+            currentTime={audioRef.current?.currentTime || 0}
+            duration={currentTrack?.duration || 0}
+            volume={localVolume}
+            onVolumeChange={handleVolumeChange}
+          />
+        </div>
 
-        {/* ボリュームコントロール */}
-        <div className="flex items-center space-x-2">
+        {/* ボリュームコントロール - タブレット以上 */}
+        <div className="hidden md:flex items-center space-x-2">
           <motion.button
             onClick={toggleMute}
             className="text-gray-400 hover:text-white"
@@ -589,7 +723,8 @@ export default function PlayerBar({
           </motion.button>
           
           <Slider.Root
-            className="relative flex items-center select-none touch-none w-20 h-5"
+            className="relative flex items-center select-none touch-none w-16 sm:w-20 h-5"
+            style={{ touchAction: 'none' }}
             value={[isMuted ? 0 : localVolume]}
             onValueChange={handleVolumeChange}
             max={100}
@@ -605,7 +740,20 @@ export default function PlayerBar({
           </Slider.Root>
         </div>
 
+        {/* デバイス制御ボタン */}
         <motion.button
+          onClick={() => setIsDeviceMenuOpen(!isDeviceMenuOpen)}
+          className="text-gray-400 hover:text-white hidden sm:block"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          title="デバイス制御"
+        >
+          <Monitor className="w-4 h-4" />
+        </motion.button>
+
+        {/* メニューボタン */}
+        <motion.button
+          onClick={handleTrackMenuOpen}
           className="text-gray-400 hover:text-white"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -629,12 +777,16 @@ export default function PlayerBar({
           position={trackMenuPosition}
           onEdit={() => {
             // TODO: 編集モーダルを開く
+            setIsTrackMenuOpen(false);
           }}
           onDelete={() => {
-            // TODO: トラックを削除
+            // トラック削除後、再生を停止
+            playPause();
+            setIsTrackMenuOpen(false);
           }}
           onAddToPlaylist={() => {
             // TODO: プレイリストに追加
+            setIsTrackMenuOpen(false);
           }}
         />
       )}

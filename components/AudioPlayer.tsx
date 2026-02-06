@@ -150,7 +150,7 @@ export default function AudioPlayer({
       <audio
         ref={audioRef}
         src={src}
-        preload="metadata"
+        preload="auto"
         crossOrigin="anonymous"
       />
       {audioMetadata && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Trash2, 
@@ -8,9 +8,11 @@ import {
   ListPlus, 
   Share2, 
   Info,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useMusicStore } from '@/lib/store';
 
 interface Track {
   id: string;
@@ -39,7 +41,9 @@ export default function TrackMenu({
   onAddToPlaylist
 }: TrackMenuProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPlaylistSelect, setShowPlaylistSelect] = useState(false);
   const [deleteFile, setDeleteFile] = useState(false);
+  const { playlists } = useMusicStore();
 
   const handleDelete = async () => {
     try {
@@ -62,6 +66,28 @@ export default function TrackMenu({
     }
   };
 
+  const handleAddToPlaylist = async (playlistId: string) => {
+    try {
+      const response = await fetch(`/api/playlists/${playlistId}/tracks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackId: track.id })
+      });
+
+      if (response.ok) {
+        toast.success('プレイリストに追加しました');
+        onAddToPlaylist?.();
+        onClose();
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'プレイリストへの追加に失敗しました');
+      }
+    } catch (error) {
+      console.error('Add to playlist error:', error);
+      toast.error('プレイリストへの追加中にエラーが発生しました');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -74,7 +100,7 @@ export default function TrackMenu({
       
       {/* メニュー */}
       <AnimatePresence>
-        {!showDeleteConfirm ? (
+        {!showDeleteConfirm && !showPlaylistSelect ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -95,10 +121,7 @@ export default function TrackMenu({
             {/* メニュー項目 */}
             <div className="py-1">
               <button
-                onClick={() => {
-                  onAddToPlaylist?.();
-                  onClose();
-                }}
+                onClick={() => setShowPlaylistSelect(true)}
                 className="w-full px-4 py-2 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left"
               >
                 <ListPlus className="w-4 h-4 text-gray-400" />
@@ -148,6 +171,58 @@ export default function TrackMenu({
                 <Trash2 className="w-4 h-4 text-red-500" />
                 <span className="text-sm text-red-500">ライブラリから削除</span>
               </button>
+            </div>
+          </motion.div>
+        ) : showPlaylistSelect ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            className="fixed z-50 w-80 glass-dark rounded-xl border border-white/10 shadow-2xl overflow-hidden"
+            style={{
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+            }}
+          >
+            {/* ヘッダー */}
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="font-semibold text-white">プレイリストを選択</h3>
+              <button
+                onClick={() => setShowPlaylistSelect(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* プレイリスト一覧 */}
+            <div className="max-h-64 overflow-y-auto">
+              {playlists.length === 0 ? (
+                <div className="p-4 text-center text-gray-400 text-sm">
+                  プレイリストがありません
+                </div>
+              ) : (
+                <div className="py-1">
+                  {playlists.map((playlist) => (
+                    <button
+                      key={playlist.id}
+                      onClick={() => handleAddToPlaylist(playlist.id)}
+                      className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left"
+                    >
+                      <div className="w-10 h-10 bg-gray-700 rounded flex items-center justify-center">
+                        <ListPlus className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-white truncate">{playlist.name}</div>
+                        {playlist.description && (
+                          <div className="text-xs text-gray-400 truncate">{playlist.description}</div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         ) : (

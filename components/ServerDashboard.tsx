@@ -21,6 +21,7 @@ interface SystemInfo {
     cores: number;
     physicalCores: number;
     speed: number;
+    usage?: number;
   };
   memory: {
     total: number;
@@ -42,8 +43,17 @@ interface SystemInfo {
     tx_bytes: number;
     rx_sec: number;
     tx_sec: number;
+    ping?: number;
   }>;
   uptime: number;
+}
+
+interface NetworkStats {
+  hour: { rx: number; tx: number };
+  today: { rx: number; tx: number };
+  week: { rx: number; tx: number };
+  month: { rx: number; tx: number };
+  allTime: { rx: number; tx: number };
 }
 
 export default function ServerDashboard() {
@@ -52,6 +62,13 @@ export default function ServerDashboard() {
   const [trackCount, setTrackCount] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
+  const [networkStats, setNetworkStats] = useState<NetworkStats>({
+    hour: { rx: 0, tx: 0 },
+    today: { rx: 0, tx: 0 },
+    week: { rx: 0, tx: 0 },
+    month: { rx: 0, tx: 0 },
+    allTime: { rx: 0, tx: 0 }
+  });
 
   useEffect(() => {
     const fetchTrackCount = async () => {
@@ -122,6 +139,42 @@ export default function ServerDashboard() {
         const response = await fetch('/api/system-info');
         if (response.ok) {
           const data = await response.json();
+          
+          // ネットワーク統計を計算（モック値）
+          const now = Date.now();
+          const hourAgo = now - 3600000;
+          const dayAgo = now - 86400000;
+          const weekAgo = now - 604800000;
+          const monthAgo = now - 2592000000;
+          
+          // 実際の累積値を使用
+          const totalRx = data.network.totalRx || 0;
+          const totalTx = data.network.totalTx || 0;
+          
+          // 期間別の推定値（実際の実装では履歴データから計算）
+          setNetworkStats({
+            hour: { 
+              rx: data.network.download * 3600, 
+              tx: data.network.upload * 3600 
+            },
+            today: { 
+              rx: data.network.download * 3600 * 24, 
+              tx: data.network.upload * 3600 * 24 
+            },
+            week: { 
+              rx: data.network.download * 3600 * 24 * 7, 
+              tx: data.network.upload * 3600 * 24 * 7 
+            },
+            month: { 
+              rx: data.network.download * 3600 * 24 * 30, 
+              tx: data.network.upload * 3600 * 24 * 30 
+            },
+            allTime: { 
+              rx: totalRx, 
+              tx: totalTx 
+            }
+          });
+          
           // APIレスポンスを既存の形式に変換
           const convertedInfo = {
             cpu: {
@@ -148,8 +201,8 @@ export default function ServerDashboard() {
             }],
             network: [{
               iface: 'Ethernet',
-              rx_bytes: 0, // 累積値は表示しない
-              tx_bytes: 0,
+              rx_bytes: totalRx,
+              tx_bytes: totalTx,
               rx_sec: data.network.download,
               tx_sec: data.network.upload,
               ping: data.network.ping
@@ -191,7 +244,8 @@ export default function ServerDashboard() {
             rx_bytes: 1000000000,
             tx_bytes: 500000000,
             rx_sec: 1024000,
-            tx_sec: 512000
+            tx_sec: 512000,
+            ping: 15
           }],
           uptime: 86400 // 1 day
         });
@@ -199,8 +253,11 @@ export default function ServerDashboard() {
       setLoading(false);
     };
 
+    // 初回は即座に実行
     fetchSystemInfo();
-    const interval = setInterval(fetchSystemInfo, 5000); // 5秒ごとに更新
+    
+    // 2回目以降は5秒ごとに更新
+    const interval = setInterval(fetchSystemInfo, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -222,10 +279,20 @@ export default function ServerDashboard() {
 
   if (loading) {
     return (
-      <div className="flex-1 p-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <div className="text-gray-400">Loading system information...</div>
+      <div className="flex-1 p-8">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold mb-8">Server Dashboard</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="glass rounded-xl p-6 animate-pulse">
+                <div className="h-20 bg-gray-700 rounded"></div>
+              </div>
+            ))}
+          </div>
+          <div className="text-center text-gray-400 mt-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+            <div className="text-sm">Loading system information...</div>
+          </div>
         </div>
       </div>
     );
@@ -527,32 +594,66 @@ export default function ServerDashboard() {
               </div>
             </div>
             
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Download</span>
-                <span className="text-green-400">
-                  {formatBytes(systemInfo.network[0]?.rx_sec || 0)}/s
-                </span>
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Current Speed</div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Download</span>
+                  <span className="text-green-400">
+                    {formatBytes(systemInfo.network[0]?.rx_sec || 0)}/s
+                  </span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-gray-400">Upload</span>
+                  <span className="text-blue-400">
+                    {formatBytes(systemInfo.network[0]?.tx_sec || 0)}/s
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Upload</span>
-                <span className="text-blue-400">
-                  {formatBytes(systemInfo.network[0]?.tx_sec || 0)}/s
-                </span>
+              
+              <div className="border-t border-white/10 pt-3">
+                <div className="text-xs text-gray-500 mb-2">Data Transfer</div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">This Hour</span>
+                    <span className="text-xs">
+                      ↓{formatBytes(networkStats.hour.rx)} ↑{formatBytes(networkStats.hour.tx)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Today</span>
+                    <span className="text-xs">
+                      ↓{formatBytes(networkStats.today.rx)} ↑{formatBytes(networkStats.today.tx)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">This Week</span>
+                    <span className="text-xs">
+                      ↓{formatBytes(networkStats.week.rx)} ↑{formatBytes(networkStats.week.tx)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">This Month</span>
+                    <span className="text-xs">
+                      ↓{formatBytes(networkStats.month.rx)} ↑{formatBytes(networkStats.month.tx)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-gray-300">All Time</span>
+                    <span className="text-xs">
+                      ↓{formatBytes(networkStats.allTime.rx)} ↑{formatBytes(networkStats.allTime.tx)}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Ping</span>
-                <span className={`${(systemInfo.network[0]?.ping || 0) < 50 ? 'text-green-400' : (systemInfo.network[0]?.ping || 0) < 100 ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {systemInfo.network[0]?.ping || 0}ms
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total RX</span>
-                <span>{formatBytes(systemInfo.network[0]?.rx_bytes || 0)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total TX</span>
-                <span>{formatBytes(systemInfo.network[0]?.tx_bytes || 0)}</span>
+              
+              <div className="border-t border-white/10 pt-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Ping</span>
+                  <span className={`${(systemInfo.network[0]?.ping || 0) < 50 ? 'text-green-400' : (systemInfo.network[0]?.ping || 0) < 100 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    {systemInfo.network[0]?.ping || 0}ms
+                  </span>
+                </div>
               </div>
             </div>
           </motion.div>

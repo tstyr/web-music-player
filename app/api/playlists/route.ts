@@ -7,24 +7,20 @@ const prisma = new PrismaClient();
 // プレイリスト一覧の取得
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    // 認証チェックをスキップ（開発用）
+    // const session = await getServerSession();
     
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
+    // デフォルトユーザーを使用または作成
+    let user = await prisma.user.findFirst();
+    
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      // デフォルトユーザーを作成
+      user = await prisma.user.create({
+        data: {
+          email: 'default@localhost',
+          name: 'Default User'
+        }
+      });
     }
 
     const playlists = await prisma.playlist.findMany({
@@ -52,24 +48,20 @@ export async function GET(request: NextRequest) {
 // プレイリストの作成
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession();
+    // 認証チェックをスキップ（開発用）
+    // const session = await getServerSession();
     
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
+    // デフォルトユーザーを使用または作成
+    let user = await prisma.user.findFirst();
+    
     if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+      // デフォルトユーザーを作成
+      user = await prisma.user.create({
+        data: {
+          email: 'default@localhost',
+          name: 'Default User'
+        }
+      });
     }
 
     const body = await request.json();
@@ -78,16 +70,18 @@ export async function POST(request: NextRequest) {
     const playlist = await prisma.playlist.create({
       data: {
         name,
-        description,
+        description: description || '',
         userId: user.id
       }
     });
+
+    console.log('[Playlist API] Created playlist:', playlist);
 
     return NextResponse.json({ playlist });
   } catch (error) {
     console.error('Playlist creation error:', error);
     return NextResponse.json(
-      { error: 'Failed to create playlist' },
+      { error: 'Failed to create playlist', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

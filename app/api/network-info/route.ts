@@ -25,12 +25,52 @@ export async function GET() {
     }
 
     const port = process.env.PORT || '3001';
-    const url = `http://${localIP}:${port}`;
+    const localUrl = `http://${localIP}:${port}`;
+
+    // 外部IPアドレスを取得
+    let externalIP = null;
+    let externalUrl = null;
+    
+    try {
+      // 複数のサービスを試す
+      const ipServices = [
+        'https://api.ipify.org?format=json',
+        'https://api.my-ip.io/ip.json',
+        'https://ipapi.co/json/'
+      ];
+
+      for (const service of ipServices) {
+        try {
+          const response = await fetch(service, { 
+            signal: AbortSignal.timeout(3000) // 3秒タイムアウト
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            externalIP = data.ip || data.IP || data.query;
+            if (externalIP) {
+              externalUrl = `http://${externalIP}:${port}`;
+              break;
+            }
+          }
+        } catch (err) {
+          // 次のサービスを試す
+          continue;
+        }
+      }
+    } catch (error) {
+      console.log('External IP fetch failed:', error);
+      // 外部IPが取得できなくてもエラーにしない
+    }
 
     return NextResponse.json({
       localIP,
+      externalIP,
       port,
-      url
+      localUrl,
+      externalUrl,
+      // ポートフォワーディング設定が必要かどうか
+      needsPortForwarding: externalIP !== null
     });
   } catch (error) {
     console.error('Network info error:', error);

@@ -67,13 +67,30 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
       return;
     }
 
+    // ファイルサイズのバリデーション（100MB制限）
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    const oversizedFiles = audioFiles.filter(file => file.size > MAX_FILE_SIZE);
+    
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`).join('\n');
+      alert(`以下のファイルはサイズが大きすぎます（最大100MB）:\n\n${fileNames}\n\n小さいファイルのみアップロードされます。`);
+    }
+
+    // サイズ制限内のファイルのみ処理
+    const validFiles = audioFiles.filter(file => file.size <= MAX_FILE_SIZE);
+    
+    if (validFiles.length === 0) {
+      alert('アップロード可能なファイルがありません。');
+      return;
+    }
+
     setIsUploading(true);
     setUploadResults([]);
     setShowResults(true);
 
     try {
       const formData = new FormData();
-      audioFiles.forEach(file => {
+      validFiles.forEach(file => {
         formData.append('files', file);
       });
 
@@ -148,6 +165,7 @@ export default function UploadZone({ onUploadComplete }: UploadZoneProps) {
           <div className="text-sm text-gray-500">
             <p>対応フォーマット: MP3, FLAC, WAV, M4A, AAC, OGG, WMA, DSD</p>
             <p className="mt-1">ハイレゾ音源（192kHz/24bit）まで対応</p>
+            <p className="mt-1 text-yellow-500">最大ファイルサイズ: 100MB</p>
           </div>
         </motion.div>
       </motion.div>

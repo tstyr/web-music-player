@@ -12,7 +12,9 @@ import {
   FolderOpen,
   Music,
   Upload,
-  Settings
+  Settings,
+  ListPlus,
+  Trash2
 } from 'lucide-react';
 import { useMusicStore } from '@/lib/store';
 
@@ -33,10 +35,10 @@ export default function Sidebar({
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
 
-  // プレイリストを取得
+  // プレイリストを取得（初回のみ）
   useEffect(() => {
     fetchPlaylists();
-  }, []);
+  }, []); // 空の依存配列で初回のみ実行
 
   const fetchPlaylists = async () => {
     try {
@@ -51,7 +53,12 @@ export default function Sidebar({
   };
 
   const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) return;
+    if (!newPlaylistName.trim()) {
+      console.log('[Sidebar] Playlist name is empty');
+      return;
+    }
+
+    console.log('[Sidebar] Creating playlist:', newPlaylistName);
 
     try {
       const response = await fetch('/api/playlists', {
@@ -63,14 +70,22 @@ export default function Sidebar({
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('[Sidebar] Response status:', response.status);
+      const data = await response.json();
+      console.log('[Sidebar] Response data:', data);
+
+      if (response.ok && data.playlist) {
+        console.log('[Sidebar] Playlist created successfully:', data.playlist);
         setPlaylists([...playlists, data.playlist]);
         setNewPlaylistName('');
         setIsCreatingPlaylist(false);
+      } else {
+        console.error('[Sidebar] Failed to create playlist:', data.error);
+        alert(`プレイリストの作成に失敗しました: ${data.error || '不明なエラー'}`);
       }
     } catch (error) {
-      console.error('Failed to create playlist:', error);
+      console.error('[Sidebar] Failed to create playlist:', error);
+      alert('プレイリストの作成中にエラーが発生しました');
     }
   };
 
@@ -78,9 +93,29 @@ export default function Sidebar({
     onViewChange(`playlist:${playlistId}`);
   };
 
+  const handleDeletePlaylist = async (playlistId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm('このプレイリストを削除しますか？')) return;
+    
+    try {
+      const response = await fetch(`/api/playlists/${playlistId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setPlaylists(playlists.filter(p => p.id !== playlistId));
+        if (currentView === `playlist:${playlistId}`) {
+          onViewChange('home');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete playlist:', error);
+    }
+  };
+
   const mainMenuItems = [
     { id: 'home', label: 'Home', icon: Home },
-    { id: 'search', label: 'Search', icon: Search },
     { id: 'library', label: 'Your Library', icon: Library },
   ];
 
@@ -91,46 +126,43 @@ export default function Sidebar({
   ];
 
   return (
-    <div className="w-64 h-full glass-dark border-r border-white/10 flex flex-col">
+    <div className="w-64 lg:w-64 md:w-20 h-full glass-dark border-r border-white/10 flex flex-col overflow-hidden transition-all duration-300">
       {/* ロゴエリア */}
-      <div className="p-6 border-b border-white/10">
+      <div className="p-4 sm:p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center space-x-2">
-          <Music className="w-8 h-8 text-green-500" />
-          <span className="text-xl font-bold">Spotify Clone</span>
+          <Music className="w-6 h-6 sm:w-8 sm:h-8 text-green-500 flex-shrink-0" />
+          <span className="text-lg sm:text-xl font-bold truncate md:hidden lg:inline">Spotify Clone</span>
         </div>
       </div>
 
       {/* メインメニュー */}
-      <div className="px-3 py-4">
+      <div className="px-2 sm:px-3 py-3 sm:py-4 flex-shrink-0">
         <nav className="space-y-1">
           {mainMenuItems.map((item) => (
-            <motion.button
+            <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+              className={`w-full flex items-center space-x-3 px-2 sm:px-3 py-2 rounded-lg text-left transition-colors text-sm sm:text-base ${
                 currentView === item.id
                   ? 'bg-white/10 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.98 }}
+              title={item.label}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
-            </motion.button>
+              <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+              <span className="font-medium truncate md:hidden lg:inline">{item.label}</span>
+            </button>
           ))}
         </nav>
       </div>
 
       {/* 音楽フォルダ選択 */}
-      <div className="px-3 py-2 border-t border-white/10">
-        <motion.button
+      <div className="px-3 py-2 border-t border-white/10 md:hidden lg:block">
+        <button
           onClick={onSelectMusicFolder}
           className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-          whileHover={{ x: 4 }}
-          whileTap={{ scale: 0.98 }}
         >
-          <FolderOpen className="w-5 h-5" />
+          <FolderOpen className="w-5 h-5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="font-medium">Music Folder</div>
             {musicFolder && (
@@ -139,17 +171,17 @@ export default function Sidebar({
               </div>
             )}
           </div>
-        </motion.button>
+        </button>
       </div>
 
       {/* サーバーメニュー */}
       <div className="px-3 py-4 border-t border-white/10">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 md:hidden lg:block">
           Server
         </div>
         <nav className="space-y-1">
           {serverMenuItems.map((item) => (
-            <motion.button
+            <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
               className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
@@ -157,12 +189,11 @@ export default function Sidebar({
                   ? 'bg-white/10 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
-              whileHover={{ x: 4 }}
-              whileTap={{ scale: 0.98 }}
+              title={item.label}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
-            </motion.button>
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="font-medium md:hidden lg:inline">{item.label}</span>
+            </button>
           ))}
         </nav>
       </div>
@@ -170,18 +201,16 @@ export default function Sidebar({
       {/* プレイリスト */}
       <div className="flex-1 px-3 py-4 border-t border-white/10 overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider md:hidden lg:block">
             Playlists
           </div>
-          <motion.button
+          <button
             onClick={() => setIsCreatingPlaylist(true)}
-            className="text-gray-400 hover:text-white"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            className="text-gray-400 hover:text-white transition-transform hover:scale-110"
             title="新しいプレイリストを作成"
           >
             <PlusCircle className="w-4 h-4" />
-          </motion.button>
+          </button>
         </div>
 
         {/* プレイリスト作成フォーム */}
@@ -218,43 +247,51 @@ export default function Sidebar({
         
         <div className="space-y-1">
           {/* Liked Songs */}
-          <motion.button
+          <button
             onClick={() => onViewChange('liked')}
             className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
               currentView === 'liked'
                 ? 'bg-white/10 text-white'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
-            whileHover={{ x: 4 }}
+            title="Liked Songs"
           >
             <div className="flex items-center space-x-3">
-              <Heart className="w-4 h-4 text-green-500 fill-current" />
-              <span className="text-sm truncate">Liked Songs</span>
+              <Heart className="w-4 h-4 text-green-500 fill-current flex-shrink-0" />
+              <span className="text-sm truncate md:hidden lg:inline">Liked Songs</span>
             </div>
-          </motion.button>
+          </button>
 
           {/* ユーザーのプレイリスト */}
-          {playlists.map((playlist, index) => (
-            <motion.button
+          {playlists.map((playlist) => (
+            <div
               key={playlist.id}
-              onClick={() => handlePlaylistClick(playlist.id)}
-              className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                currentView === `playlist:${playlist.id}`
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-              whileHover={{ x: 4 }}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
+              className="group relative"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-gray-600 rounded-sm flex items-center justify-center">
-                  <Music className="w-2.5 h-2.5" />
+              <button
+                onClick={() => handlePlaylistClick(playlist.id)}
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                  currentView === `playlist:${playlist.id}`
+                    ? 'bg-white/10 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+                title={playlist.name}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <ListPlus className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm truncate md:hidden lg:inline">{playlist.name}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeletePlaylist(playlist.id, e)}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity md:hidden lg:inline-block"
+                    title="プレイリストを削除"
+                  >
+                    <Trash2 className="w-3 h-3 text-red-500" />
+                  </button>
                 </div>
-                <span className="text-sm truncate">{playlist.name}</span>
-              </div>
-            </motion.button>
+              </button>
+            </div>
           ))}
         </div>
       </div>

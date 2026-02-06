@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Stream Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #1db954;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1ed760;
+        }
+        .log {
+            background: #000;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Audio Stream Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Direct File Name</h2>
+        <p>URL: <code>/api/music/stream/8-twelve.mp3</code></p>
+        <audio id="audio1" controls>
+            <source src="/api/music/stream/8-twelve.mp3" type="audio/mpeg">
+        </audio>
+        <button onclick="testAudio('audio1')">Test Play</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Encoded File Name</h2>
+        <p>URL: <code id="url2"></code></p>
+        <audio id="audio2" controls></audio>
+        <button onclick="testAudio('audio2')">Test Play</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Fetch Tracks and Play First</h2>
+        <button onclick="fetchAndPlay()">Fetch Tracks</button>
+        <audio id="audio3" controls></audio>
+        <div id="trackInfo"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}<br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function testAudio(audioId) {
+            const audio = document.getElementById(audioId);
+            log(`Testing ${audioId}: ${audio.src}`);
+            
+            audio.play()
+                .then(() => log(`✅ ${audioId} playing`))
+                .catch(err => log(`❌ ${audioId} error: ${err.message}`));
+        }
+
+        // Test 2: エンコードされたファイル名
+        const fileName = '8-twelve.mp3';
+        const encodedFileName = encodeURIComponent(fileName);
+        const url2 = `/api/music/stream/${encodedFileName}`;
+        document.getElementById('url2').textContent = url2;
+        document.getElementById('audio2').src = url2;
+
+        // Test 3: APIからトラックを取得
+        async function fetchAndPlay() {
+            try {
+                log('Fetching tracks...');
+                const response = await fetch('/api/music/tracks');
+                const data = await response.json();
+                
+                if (data.tracks && data.tracks.length > 0) {
+                    const track = data.tracks[0];
+                    log(`Found track: ${track.title} by ${track.artist}`);
+                    log(`File path: ${track.filePath}`);
+                    
+                    // ファイルパスを相対パスに変換
+                    let normalizedPath = track.filePath.normalize('NFC');
+                    
+                    if (normalizedPath.includes('uploads\\music') || normalizedPath.includes('uploads/music')) {
+                        const musicIndex = normalizedPath.indexOf('uploads');
+                        if (musicIndex !== -1) {
+                            normalizedPath = normalizedPath.substring(musicIndex);
+                            normalizedPath = normalizedPath.replace(/\\/g, '/');
+                            normalizedPath = normalizedPath.replace(/^uploads\/music\//, '');
+                        }
+                    }
+                    
+                    const pathParts = normalizedPath.split('/').filter(p => p);
+                    const encodedParts = pathParts.map(part => encodeURIComponent(part));
+                    const streamUrl = `/api/music/stream/${encodedParts.join('/')}`;
+                    
+                    log(`Stream URL: ${streamUrl}`);
+                    
+                    const audio3 = document.getElementById('audio3');
+                    audio3.src = streamUrl;
+                    
+                    document.getElementById('trackInfo').innerHTML = `
+                        <p><strong>Title:</strong> ${track.title}</p>
+                        <p><strong>Artist:</strong> ${track.artist}</p>
+                        <p><strong>Original Path:</strong> ${track.filePath}</p>
+                        <p><strong>Normalized:</strong> ${normalizedPath}</p>
+                        <p><strong>Stream URL:</strong> ${streamUrl}</p>
+                    `;
+                    
+                    audio3.play()
+                        .then(() => log('✅ Track playing'))
+                        .catch(err => log(`❌ Play error: ${err.message}`));
+                } else {
+                    log('❌ No tracks found');
+                }
+            } catch (err) {
+                log(`❌ Fetch error: ${err.message}`);
+            }
+        }
+
+        log('Test page loaded');
+    </script>
+</body>
+</html>

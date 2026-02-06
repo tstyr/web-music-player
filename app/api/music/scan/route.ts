@@ -14,7 +14,12 @@ export async function POST(request: Request) {
     
     console.log('Scanning music folder:', folderPath);
     
-    const result = await scanMusicLibrary(folderPath);
+    // Socket.ioインスタンスを取得（server.jsでグローバルに設定）
+    const io = (global as any).io;
+    
+    // Socket.ioを渡してスキャン実行
+    const result = await scanMusicLibrary(folderPath, true, io);
+    
     return NextResponse.json({
       success: true,
       result,

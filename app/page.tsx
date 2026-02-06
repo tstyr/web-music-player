@@ -31,6 +31,7 @@ export default function HomePage() {
   const [musicFolder, setMusicFolder] = useState<string | null>(null);
   const [tracks, setTracks] = useState([]);
   const [backgroundColor, setBackgroundColor] = useState<'black' | 'gray' | 'white'>('black');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [gradientColors, setGradientColors] = useState({
     from: '#1db954',
     via: '#1ed760', 
@@ -117,11 +118,22 @@ export default function HomePage() {
   };
 
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${getBackgroundClass()}`}>
+    <div className="h-screen flex flex-col overflow-hidden bg-black" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+      {/* モバイルメニューボタン */}
+      <button
+        onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        className="md:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20"
+        title="メニュー"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
       {/* 背景色切り替えボタン */}
       <button
         onClick={toggleBackgroundColor}
-        className="fixed top-4 right-4 z-50 px-4 py-2 rounded-lg glass hover-lift"
+        className="fixed top-4 right-4 z-50 px-3 py-2 sm:px-4 sm:py-2 rounded-lg glass hover-lift text-sm sm:text-base"
         title="背景色切り替え"
       >
         {backgroundColor === 'black' && '🌑 黒'}
@@ -129,18 +141,35 @@ export default function HomePage() {
         {backgroundColor === 'white' && '☀️ 白'}
       </button>
       
-      {/* メインコンテンツエリア */}
-      <div className="flex flex-1 relative z-10 min-h-0">
-        {/* サイドバー */}
-        <Sidebar 
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          onSelectMusicFolder={handleSelectMusicFolder}
-          musicFolder={musicFolder}
-        />
+      {/* メインコンテンツエリア - 再生バーの高さを引いた高さ */}
+      <div className="flex flex-1 relative z-10 overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
+        {/* サイドバー - モバイルではオーバーレイ */}
+        <div className={`
+          fixed md:relative inset-y-0 left-0 z-40 
+          transform transition-transform duration-300 ease-in-out
+          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
+          <Sidebar 
+            currentView={currentView}
+            onViewChange={(view) => {
+              setCurrentView(view);
+              setIsMobileSidebarOpen(false); // モバイルでビュー変更時にメニューを閉じる
+            }}
+            onSelectMusicFolder={handleSelectMusicFolder}
+            musicFolder={musicFolder}
+          />
+        </div>
+
+        {/* モバイルオーバーレイ */}
+        {isMobileSidebarOpen && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 z-30"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
         
         {/* メインコンテンツ */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-gray-900 to-black">
           <MainContent 
             onTrackSelect={handleTrackSelect}
             musicFolder={musicFolder}
@@ -150,8 +179,8 @@ export default function HomePage() {
         </div>
       </div>
       
-      {/* プレイヤーバー */}
-      <div className="flex-shrink-0">
+      {/* プレイヤーバー - 固定位置（画面下部） */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 safe-bottom">
         <PlayerBar 
           gradientColors={gradientColors}
           audioRef={audioRef}

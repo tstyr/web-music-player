@@ -2,6 +2,8 @@
 
 高品質な音楽再生とマルチデバイス同期機能を備えた、モダンなWebベースの音楽プレイヤー。
 
+> **🚀 [クイックスタートガイド](./QUICKSTART.md)** - 5分で起動！
+
 ## 主な機能
 
 ### 🎵 音楽再生
@@ -27,6 +29,13 @@
 - **レスポンシブ**: デスクトップ、タブレット、スマホに対応
 - **キーボードショートカット**: スペースキーで再生/一時停止など
 
+### 📱 PWA & モバイル最適化
+- **Progressive Web App**: ホーム画面に追加してアプリのように使用可能
+- **Media Session API**: ロック画面・通知センターから操作可能
+- **オフライン対応**: Service Workerによるキャッシング
+- **タッチ最適化**: スムーズなスライダー操作とタップ領域最適化
+- **iOS Safari対応**: 100vh問題とセーフエリア対応済み
+
 ## 技術スタック
 
 - **フロントエンド**: Next.js 14 (App Router), React 18, TypeScript
@@ -39,17 +48,50 @@
 
 ## セットアップ
 
-### 必要要件
+### 🚀 超簡単スタート（推奨）
+
+**1コマンドで完了！**
+
+#### Windows:
+```bash
+start.bat
+```
+
+#### macOS/Linux:
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+自動的にセットアップと起動が完了します。
+
+---
+
+### 📝 手動セットアップ
+
+#### 必要要件
 - Node.js 18以上
 - npm または yarn
 
-### インストール
+#### インストール
 
 ```bash
 # リポジトリをクローン
 git clone https://github.com/tstyr/web-music-player.git
 cd web-music-player
 
+# セットアップスクリプトを実行
+# Windows
+setup.bat
+
+# macOS/Linux
+chmod +x setup.sh
+./setup.sh
+```
+
+または手動で：
+
+```bash
 # 依存関係をインストール
 npm install
 
@@ -93,11 +135,263 @@ npm run dev
 # http://localhost:3001
 ```
 
+#### Cloudflare Tunnelと一緒に起動:
+
+**Windows:**
+```bash
+start-with-tunnel.bat
+```
+
+**macOS/Linux:**
+```bash
+chmod +x start-with-tunnel.sh
+./start-with-tunnel.sh
+```
+
 ### Electronアプリとして起動（オプション）
 
 ```bash
 # Electronで起動
 npm run electron-dev
+```
+
+## 外部ネットワークからのアクセス
+
+### 方法1: Cloudflare Tunnel（推奨）⭐
+
+**最も簡単で安全な方法です。ポート開放不要！**
+
+#### メリット：
+- ✅ ポートフォワーディング不要
+- ✅ 無料で利用可能
+- ✅ HTTPS自動設定
+- ✅ DDoS保護付き
+- ✅ 5分でセットアップ完了
+
+#### 超簡単スタート（Quick Tunnel）：
+
+**🌟 自動ブラウザ起動版（推奨）:**
+
+**Windows:**
+```bash
+start-with-tunnel-simple.bat
+```
+
+このスクリプトは自動的に：
+1. cloudflaredを検出（Downloadsフォルダも確認）
+2. Quick Tunnelで一時的な公開URLを生成
+3. **ブラウザを自動で開く** 🚀
+4. サーバーを起動
+5. スマホでアクセスする方法を表示
+
+**通常版（手動でURLを確認）:**
+
+**Windows:**
+```bash
+start-with-tunnel.bat
+```
+
+**macOS/Linux:**
+```bash
+chmod +x start-with-tunnel.sh
+./start-with-tunnel.sh
+```
+
+**注意**: Quick TunnelのURLは一時的です。固定URLが必要な場合は下記の手順でNamed Tunnelを設定してください。
+
+#### Named Tunnel（固定URL）のセットアップ：
+
+```bash
+# 1. cloudflaredをインストール
+winget install --id Cloudflare.cloudflared
+
+# 2. Cloudflareにログイン
+cloudflared tunnel login
+
+# 3. トンネルを作成
+cloudflared tunnel create music-player
+
+# 4. 設定ファイルを作成（~/.cloudflared/config.yml）
+tunnel: music-player
+credentials-file: /path/to/credentials.json
+ingress:
+  - hostname: music.yourdomain.com
+    service: http://localhost:3001
+  - service: http_status:404
+
+# 5. DNSを設定
+cloudflared tunnel route dns music-player music.yourdomain.com
+
+# 6. トンネルを起動
+cloudflared tunnel run music-player
+```
+
+詳細は [CLOUDFLARE_TUNNEL_SETUP.md](./CLOUDFLARE_TUNNEL_SETUP.md) を参照してください。
+
+---
+
+### 方法2: ポートフォワーディング（従来の方法）
+
+### 概要
+デフォルトではローカルネットワーク内のデバイスからのみアクセス可能ですが、以下の設定で外部（インターネット）からもアクセスできます。
+
+### 1. ネットワーク情報の確認
+
+1. サーバーを起動後、「Server Status」ページにアクセス
+2. 「ネットワークアクセス」セクションで以下を確認：
+   - **ローカルIP**: 同じWi-Fi内のデバイス用
+   - **外部IP**: インターネット経由のアクセス用
+
+### 2. ポートフォワーディング設定
+
+外部からアクセスするには、ルーターでポート転送を設定する必要があります：
+
+#### 一般的な手順：
+
+1. **ルーターの管理画面にアクセス**
+   - ブラウザで `http://192.168.1.1` または `http://192.168.0.1` を開く
+   - ルーターのユーザー名とパスワードでログイン
+
+2. **ポートフォワーディング設定を開く**
+   - 「ポートフォワーディング」「仮想サーバー」「NAT設定」などの項目を探す
+
+3. **新しいルールを追加**
+   ```
+   サービス名: Music Player
+   外部ポート: 3001
+   内部IP: [ローカルIP] (例: 192.168.1.100)
+   内部ポート: 3001
+   プロトコル: TCP
+   ```
+
+4. **設定を保存して再起動**
+
+#### ルーター別の詳細ガイド：
+- [PortForward.com](https://portforward.com/) - 各メーカーの詳細手順
+
+### 3. 動的DNS（DDNS）の設定（推奨）
+
+外部IPアドレスは変わる可能性があるため、DDNSサービスの利用を推奨：
+
+- **No-IP**: https://www.noip.com/
+- **DuckDNS**: https://www.duckdns.org/
+- **Dynu**: https://www.dynu.com/
+
+設定後、`http://your-domain.ddns.net:3001` のような固定URLでアクセス可能になります。
+
+### 4. PWA（Progressive Web App）として使用
+
+Cloudflare Tunnel経由でHTTPSアクセスすると、スマホやタブレットでPWAとして使用できます：
+
+#### iOS（iPhone/iPad）:
+1. Safariでアプリを開く
+2. 共有ボタン（□↑）をタップ
+3. 「ホーム画面に追加」を選択
+4. アプリ名を確認して「追加」
+
+#### Android:
+1. Chromeでアプリを開く
+2. メニュー（⋮）をタップ
+3. 「ホーム画面に追加」を選択
+4. アプリ名を確認して「追加」
+
+#### PWA機能:
+- ✅ ブラウザの枠なしでアプリのように起動
+- ✅ ロック画面から再生コントロール
+- ✅ 通知センターでの操作
+- ✅ イヤホンのリモコン対応
+- ✅ オフラインキャッシング
+- ✅ ホーム画面アイコン
+
+**注意**: PWA機能を使用するにはHTTPS接続が必要です（Cloudflare Tunnelを推奨）。
+
+### 4. セキュリティ対策
+
+外部公開する場合は、以下のセキュリティ対策を実施してください：
+
+#### 基本認証の追加（推奨）
+
+`server.js`に以下を追加：
+
+```javascript
+const basicAuth = require('express-basic-auth');
+
+app.use(basicAuth({
+  users: { 'admin': 'your-strong-password' },
+  challenge: true,
+  realm: 'Music Player'
+}));
+```
+
+#### HTTPS化（強く推奨）
+
+Let's Encryptで無料のSSL証明書を取得：
+
+```bash
+# Certbotをインストール
+sudo apt-get install certbot
+
+# 証明書を取得
+sudo certbot certonly --standalone -d your-domain.com
+```
+
+`server.js`でHTTPSを有効化：
+
+```javascript
+const https = require('https');
+const fs = require('fs');
+
+const options = {
+  key: fs.readFileSync('/etc/letsencrypt/live/your-domain.com/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/your-domain.com/fullchain.pem')
+};
+
+https.createServer(options, app).listen(443);
+```
+
+#### ファイアウォール設定
+
+```bash
+# UFWを使用する場合
+sudo ufw allow 3001/tcp
+sudo ufw enable
+```
+
+### 5. QRコードでアクセス
+
+1. 「Server Status」ページの「外部ネットワーク」タブを開く
+2. QRコードをスマホでスキャン
+3. 自動的にブラウザでアプリが開きます
+
+### トラブルシューティング
+
+#### 外部からアクセスできない場合：
+
+1. **ポート転送が正しく設定されているか確認**
+   ```bash
+   # ポートが開いているかテスト
+   telnet your-external-ip 3001
+   ```
+
+2. **ファイアウォールを確認**
+   - Windows: Windows Defenderファイアウォール
+   - Linux: `sudo ufw status`
+
+3. **ISPの制限を確認**
+   - 一部のISPはポート80/443以外をブロックしている場合があります
+
+4. **ルーターの再起動**
+   - 設定変更後はルーターを再起動してください
+
+### セキュリティ上の注意
+
+⚠️ **重要**: 外部公開する場合は以下に注意してください：
+
+- 強力なパスワードを設定する
+- HTTPSを使用する（HTTP通信は暗号化されません）
+- 信頼できるユーザーのみにURLを共有する
+- 定期的にアクセスログを確認する
+- 不要な場合はポート転送を無効にする
 
 # ビルド
 npm run electron-build
@@ -175,6 +469,12 @@ npm run electron-build
 ### 日本語ファイル名が文字化けする
 - ファイルシステムがUTF-8をサポートしているか確認
 - Windowsの場合、ファイル名が正しくエンコードされているか確認
+
+### Cloudflare Tunnel経由でログが表示されない
+- 詳細は [LOGGING_TROUBLESHOOTING.md](./LOGGING_TROUBLESHOOTING.md) を参照
+- server.jsが最新版か確認
+- トンネルのターゲットが `http://127.0.0.1:3001` になっているか確認
+- ブラウザのコンソール（F12）でエラーを確認
 
 ## ライセンス
 

@@ -25,7 +25,9 @@ export interface SystemInfo {
   network: {
     upload: number;
     download: number;
-    ping: number; // ping追加
+    ping: number;
+    totalRx: number;
+    totalTx: number;
   };
   uptime: number;
 }
@@ -33,6 +35,8 @@ export interface SystemInfo {
 let startTime = Date.now();
 let lastNetworkStats: { rx_bytes: number; tx_bytes: number } | null = null;
 let lastNetworkTime = Date.now();
+let totalRxBytes = 0;
+let totalTxBytes = 0;
 
 async function getPing(): Promise<number> {
   try {
@@ -74,17 +78,21 @@ export async function getSystemInfo(): Promise<SystemInfo> {
     let uploadSpeed = 0;
     let downloadSpeed = 0;
 
+    const totalRx = networkStats.reduce((sum, stat) => sum + stat.rx_bytes, 0);
+    const totalTx = networkStats.reduce((sum, stat) => sum + stat.tx_bytes, 0);
+
     if (lastNetworkStats && timeDiff > 0) {
-      const totalRx = networkStats.reduce((sum, stat) => sum + stat.rx_bytes, 0);
-      const totalTx = networkStats.reduce((sum, stat) => sum + stat.tx_bytes, 0);
-      
       downloadSpeed = (totalRx - lastNetworkStats.rx_bytes) / timeDiff;
       uploadSpeed = (totalTx - lastNetworkStats.tx_bytes) / timeDiff;
+      
+      // 累積値を更新
+      totalRxBytes += (totalRx - lastNetworkStats.rx_bytes);
+      totalTxBytes += (totalTx - lastNetworkStats.tx_bytes);
     }
 
     lastNetworkStats = {
-      rx_bytes: networkStats.reduce((sum, stat) => sum + stat.rx_bytes, 0),
-      tx_bytes: networkStats.reduce((sum, stat) => sum + stat.tx_bytes, 0),
+      rx_bytes: totalRx,
+      tx_bytes: totalTx,
     };
     lastNetworkTime = now;
 
@@ -116,6 +124,8 @@ export async function getSystemInfo(): Promise<SystemInfo> {
         upload: uploadSpeed,
         download: downloadSpeed,
         ping: ping,
+        totalRx: totalRxBytes,
+        totalTx: totalTxBytes,
       },
       uptime,
     };

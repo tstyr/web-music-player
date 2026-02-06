@@ -1,0 +1,24 @@
+<svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1db954;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1ed760;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1aa34a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="192" height="192" rx="38.400000000000006" fill="url(#grad)"/>
+  
+  <!-- 音符アイコン -->
+  <g transform="translate(57.599999999999994, 38.400000000000006)">
+    <!-- 音符の棒 -->
+    <rect x="28.799999999999997" y="0" width="15.36" height="96" fill="white" rx="3.84"/>
+    
+    <!-- 音符の丸 -->
+    <ellipse cx="36.480000000000004" cy="99.84" rx="23.04" ry="17.28" fill="white"/>
+    
+    <!-- 音符の旗 -->
+    <path d="M 44.160000000000004 9.600000000000001 Q 67.19999999999999 15.36, 67.19999999999999 34.56 L 44.160000000000004 48 Z" fill="white"/>
+  </g>
+</svg>
