@@ -293,6 +293,41 @@ export default function MainContent({
     setTrackMenuOpen(trackId);
   }, []);
 
+  const handleDeletePlaylist = async () => {
+    if (!playlistId) return;
+    
+    if (!confirm('このプレイリストを削除しますか？')) return;
+    
+    try {
+      const response = await fetch(`/api/playlists/${playlistId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast.success('プレイリストを削除しました');
+        // ホーム画面に戻る
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Failed to delete playlist:', error);
+      toast.error('プレイリストの削除に失敗しました');
+    }
+  };
+
+  const handleSharePlaylist = async () => {
+    if (!playlistId) return;
+    
+    try {
+      const shareUrl = `${window.location.origin}/playlist/share/${playlistId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('共有リンクをコピーしました！');
+      setPlaylistMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to copy share link:', error);
+      toast.error('リンクのコピーに失敗しました');
+    }
+  };
+
   if (currentView === 'dashboard') {
     return <ServerDashboard />;
   }
@@ -316,41 +351,6 @@ export default function MainContent({
       if (displayTracks.length > 0) {
         setCurrentPlaylist(displayTracks);
         onTrackSelect(displayTracks[0]);
-      }
-    };
-
-    const handleDeletePlaylist = async () => {
-      if (!playlistId) return;
-      
-      if (!confirm('このプレイリストを削除しますか？')) return;
-      
-      try {
-        const response = await fetch(`/api/playlists/${playlistId}`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          toast.success('プレイリストを削除しました');
-          // ホーム画面に戻る
-          window.location.href = '/';
-        }
-      } catch (error) {
-        console.error('Failed to delete playlist:', error);
-        toast.error('プレイリストの削除に失敗しました');
-      }
-    };
-
-    const handleSharePlaylist = async () => {
-      if (!playlistId) return;
-      
-      try {
-        const shareUrl = `${window.location.origin}/playlist/share/${playlistId}`;
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success('共有リンクをコピーしました！');
-        setPlaylistMenuOpen(false);
-      } catch (error) {
-        console.error('Failed to copy share link:', error);
-        toast.error('リンクのコピーに失敗しました');
       }
     };
 
