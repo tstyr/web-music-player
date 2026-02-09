@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import path from 'path';
 import fs from 'fs';
-import * as mm from 'music-metadata';
+import { parseFile } from 'music-metadata';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,7 +107,7 @@ async function scanMusicFolder(folderPath: string): Promise<any[]> {
             let channels = 2;
 
             try {
-              const metadata = await mm.parseFile(filePath, {
+              const metadata = await parseFile(filePath, {
                 skipCovers: false,
                 includeChapters: false
               });
