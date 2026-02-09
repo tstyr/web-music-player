@@ -17,7 +17,6 @@ import {
   Monitor
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
-import AudioVisualizer from './AudioVisualizer';
 import DeviceControl from './DeviceControl';
 import TrackMenu from './TrackMenu';
 import { useMusicStore } from '@/lib/store';
@@ -29,13 +28,11 @@ interface PlayerBarProps {
     to: string;
   };
   audioRef?: React.RefObject<HTMLAudioElement>;
-  onAnalyserReady?: (analyser: AnalyserNode) => void;
 }
 
 export default function PlayerBar({ 
   gradientColors,
-  audioRef: externalAudioRef,
-  onAnalyserReady
+  audioRef: externalAudioRef
 }: PlayerBarProps) {
   const {
     currentTrack,
@@ -70,9 +67,6 @@ export default function PlayerBar({
   });
   const internalAudioRef = useRef<HTMLAudioElement>(null);
   const audioRef = externalAudioRef || internalAudioRef;
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Zustandのprogressをローカルに同期
   useEffect(() => {
@@ -279,40 +273,6 @@ export default function PlayerBar({
     return () => clearInterval(intervalId);
   }, [currentTrack]);
 
-  // Web Audio API の初期化
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || analyserRef.current) return;
-
-    try {
-      console.log('Initializing Web Audio API...');
-      
-      // AudioContext の作成
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      // AnalyserNode の作成
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 4096;
-      analyserRef.current.smoothingTimeConstant = 0.8;
-      
-      // MediaElementAudioSourceNode の作成
-      sourceRef.current = audioContextRef.current.createMediaElementSource(audio);
-      
-      // 接続: source -> analyser -> destination
-      sourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioContextRef.current.destination);
-      
-      console.log('Web Audio API initialized successfully');
-      
-      // 親コンポーネントに通知
-      if (onAnalyserReady && analyserRef.current) {
-        onAnalyserReady(analyserRef.current);
-      }
-    } catch (error) {
-      console.error('Failed to initialize Web Audio API:', error);
-    }
-  }, [audioRef, onAnalyserReady]);
-
   // オーディオ要素の制御とクリーンアップ
   useEffect(() => {
     const audio = audioRef.current;
@@ -390,7 +350,6 @@ export default function PlayerBar({
   // 再生/一時停止の制御
   useEffect(() => {
     const audio = audioRef.current;
-    const audioContext = audioContextRef.current;
     if (!audio || !currentTrack) return;
     
     // サンプルトラックはスキップ
@@ -399,13 +358,6 @@ export default function PlayerBar({
     }
 
     if (isPlaying) {
-      // AudioContext を再開（ブラウザのポリシー対応）
-      if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume().then(() => {
-          console.log('AudioContext resumed');
-        });
-      }
-      
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise
@@ -545,26 +497,27 @@ export default function PlayerBar({
   }
 
   return (
-    <div className="h-16 sm:h-20 glass-dark border-t border-white/10 px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
-      {/* 現在の曲情報 */}
-      <div className="flex items-center space-x-2 sm:space-x-4 w-1/4 sm:w-1/4 min-w-0 flex-shrink">
-        <motion.div 
-          className="w-10 h-10 sm:w-14 sm:h-14 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
-          whileHover={{ scale: 1.05 }}
-          onClick={() => setIsFullscreenPlayer(true)}
-        >
-          {currentTrack.artwork ? (
-            <img 
-              src={currentTrack.artwork} 
-              alt={currentTrack.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center">
-              <span className="text-xs text-gray-400">♪</span>
-            </div>
-          )}
-        </motion.div>
+    <div className="h-20 glass-dark border-t border-white/10 px-2 sm:px-4 flex items-center justify-center gap-2 sm:gap-4">
+      <div className="w-full max-w-screen-2xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+        {/* 現在の曲情報 */}
+        <div className="flex items-center space-x-2 sm:space-x-4 w-1/4 min-w-0 flex-shrink">
+          <motion.div 
+            className="w-10 h-10 sm:w-14 sm:h-14 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
+            whileHover={{ scale: 1.05 }}
+            onClick={() => setIsFullscreenPlayer(true)}
+          >
+            {currentTrack.artwork ? (
+              <img 
+                src={currentTrack.artwork} 
+                alt={currentTrack.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center">
+                <span className="text-xs text-gray-400">♪</span>
+              </div>
+            )}
+          </motion.div>
         
         <div 
           className="min-w-0 flex-1 cursor-pointer hidden sm:block"
@@ -691,26 +644,6 @@ export default function PlayerBar({
           <div className="text-green-400">{audioFormat.format} • {audioFormat.quality}</div>
         </div>
 
-        {/* ビジュアライザー - タブレット以上 */}
-        <div className="hidden md:block">
-          <AudioVisualizer 
-            isPlaying={isPlaying} 
-            analyser={analyserRef.current}
-            className="w-12 h-6 sm:w-16 sm:h-8"
-            barCount={32}
-            height={32}
-            backgroundColor="black"
-            currentTrack={currentTrack}
-            onPlayPause={playPause}
-            progress={localProgress}
-            onProgressChange={handleProgressChange}
-            currentTime={audioRef.current?.currentTime || 0}
-            duration={currentTrack?.duration || 0}
-            volume={localVolume}
-            onVolumeChange={handleVolumeChange}
-          />
-        </div>
-
         {/* ボリュームコントロール - タブレット以上 */}
         <div className="hidden md:flex items-center space-x-2">
           <motion.button
@@ -776,20 +709,18 @@ export default function PlayerBar({
           onClose={() => setIsTrackMenuOpen(false)}
           position={trackMenuPosition}
           onEdit={() => {
-            // TODO: 編集モーダルを開く
             setIsTrackMenuOpen(false);
           }}
           onDelete={() => {
-            // トラック削除後、再生を停止
             playPause();
             setIsTrackMenuOpen(false);
           }}
           onAddToPlaylist={() => {
-            // TODO: プレイリストに追加
             setIsTrackMenuOpen(false);
           }}
         />
       )}
+      </div>
     </div>
   );
 }

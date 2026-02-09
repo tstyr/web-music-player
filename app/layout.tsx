@@ -63,6 +63,34 @@ export default function RootLayout({
             } else {
               console.log('[PWA] Service Worker disabled (localhost detected)');
             }
+
+            // Cloudflare Tunnel URL自動設定
+            (async function() {
+              try {
+                const WORKERS_URL = 'https://music.haka01xx.workers.dev/tunnel';
+                const API_URL_KEY = 'music_server_api_url';
+                
+                const response = await fetch(WORKERS_URL);
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.url) {
+                    const currentUrl = localStorage.getItem(API_URL_KEY);
+                    if (currentUrl !== data.url) {
+                      localStorage.setItem(API_URL_KEY, data.url);
+                      console.log('[Tunnel] トンネルURLを自動設定:', data.url);
+                      
+                      // URLが変更された場合はリロード
+                      if (currentUrl && currentUrl !== data.url) {
+                        console.log('[Tunnel] URLが変更されました。リロードします...');
+                        window.location.reload();
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn('[Tunnel] URL取得エラー:', error);
+              }
+            })();
           `
         }} />
       </body>

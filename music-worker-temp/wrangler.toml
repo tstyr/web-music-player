@@ -1,0 +1,7 @@
+name = "music"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "TUNNEL_KV"
+id = "0e88fba34cc944d4b9bdddc6d5a9f5a8"

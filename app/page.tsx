@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar';
 import PlayerBar from '@/components/PlayerBar';
 import MainContent from '@/components/MainContent';
 import FullscreenPlayer from '@/components/FullscreenPlayer';
+import ServerUrlConfig from '@/components/ServerUrlConfig';
 import { useMusicStore } from '@/lib/store';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useSocket } from '@/hooks/useSocket';
@@ -38,7 +39,6 @@ export default function HomePage() {
     to: '#1aa34a'
   });
   const audioRef = useRef<HTMLAudioElement>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
 
   // Electron APIの初期化チェック
   useEffect(() => {
@@ -118,7 +118,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-black" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+    <div className="h-screen flex flex-col overflow-hidden bg-black" style={{ height: '100dvh' }}>
       {/* モバイルメニューボタン */}
       <button
         onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
@@ -141,9 +141,9 @@ export default function HomePage() {
         {backgroundColor === 'white' && '☀️ 白'}
       </button>
       
-      {/* メインコンテンツエリア - 再生バーの高さを引いた高さ */}
-      <div className="flex flex-1 relative z-10 overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
-        {/* サイドバー - モバイルではオーバーレイ */}
+      {/* メインコンテンツエリア - プレイヤーバーの高さを引いた高さ */}
+      <div className="flex flex-1 relative z-10 overflow-hidden" style={{ height: 'calc(100dvh - 5rem)' }}>
+        {/* サイドバー - モバイルではオーバーレイ、タブレットではアイコンのみ */}
         <div className={`
           fixed md:relative inset-y-0 left-0 z-40 
           transform transition-transform duration-300 ease-in-out
@@ -153,7 +153,7 @@ export default function HomePage() {
             currentView={currentView}
             onViewChange={(view) => {
               setCurrentView(view);
-              setIsMobileSidebarOpen(false); // モバイルでビュー変更時にメニューを閉じる
+              setIsMobileSidebarOpen(false);
             }}
             onSelectMusicFolder={handleSelectMusicFolder}
             musicFolder={musicFolder}
@@ -168,25 +168,21 @@ export default function HomePage() {
           />
         )}
         
-        {/* メインコンテンツ */}
+        {/* メインコンテンツ - flex-1で残りの高さを全て使用 */}
         <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-gray-900 to-black">
           <MainContent 
             onTrackSelect={handleTrackSelect}
             musicFolder={musicFolder}
-            analyser={analyserRef.current}
             backgroundColor={backgroundColor}
           />
         </div>
       </div>
       
-      {/* プレイヤーバー - 固定位置（画面下部） */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 safe-bottom">
+      {/* プレイヤーバー - 固定位置（画面下部）、高さ5rem */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 h-20 safe-bottom">
         <PlayerBar 
           gradientColors={gradientColors}
           audioRef={audioRef}
-          onAnalyserReady={(analyser) => {
-            analyserRef.current = analyser;
-          }}
         />
       </div>
 
@@ -202,7 +198,6 @@ export default function HomePage() {
       <AnimatePresence>
         <FullscreenPlayer
           audioRef={audioRef}
-          analyser={analyserRef.current}
           onProgressChange={(value) => {
             const audio = audioRef.current;
             if (audio && currentTrack && currentTrack.duration > 0) {
@@ -243,6 +238,9 @@ export default function HomePage() {
           }
         }}
       />
+
+      {/* サーバーURL設定 */}
+      <ServerUrlConfig />
     </div>
   );
 }

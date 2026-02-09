@@ -29,6 +29,16 @@ export function initSocketIO(server: NetServer) {
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
+    // 時刻同期（クライアントがサーバー時刻とのオフセットを計算）
+    socket.on('time-sync-request', (clientTime) => {
+      const serverTime = Date.now();
+      socket.emit('time-sync-response', {
+        clientTime,
+        serverTime,
+        responseTime: Date.now()
+      });
+    });
+
     // 再生状態の同期
     socket.on('play', (data) => {
       console.log('Play event:', data);
@@ -55,16 +65,32 @@ export function initSocketIO(server: NetServer) {
       socket.broadcast.emit('volume-change', data);
     });
 
-    // マルチルーム同期再生
-    socket.on('sync-play', (data) => {
-      const { trackId, startTime, currentTime } = data;
-      const syncTime = Date.now() + 200; // 200ms後に同期再生
+    // 高精度同期再生（ミリ秒単位）
+    socket.on('sync-play-request', (data) => {
+      const { trackId, currentTime, delay = 150 } = data;
+      const serverTime = Date.now();
+      const syncTime = serverTime + delay; // デフォルト150ms後に同期再生
+      
+      console.log(`[Sync] Scheduling playback at ${syncTime} (in ${delay}ms)`);
       
       io.emit('sync-play-command', {
         trackId,
-        startTime,
         currentTime,
-        syncTime
+        syncTime,
+        serverTime
+      });
+    });
+
+    // 次の曲への同期切り替え
+    socket.on('sync-next-track', (data) => {
+      const { trackId, delay = 100 } = data;
+      const serverTime = Date.now();
+      const syncTime = serverTime + delay;
+      
+      io.emit('sync-track-change', {
+        trackId,
+        syncTime,
+        serverTime
       });
     });
 

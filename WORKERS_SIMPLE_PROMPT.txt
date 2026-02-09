@@ -1,0 +1,55 @@
+﻿Cloudflare Workersに以下の機能を実装してください：
+
+【エンドポイント】
+- GET /tunnel: 保存されているトンネルURLを返す
+- POST /tunnel: トンネルURLを保存する
+
+【使用技術】
+- Cloudflare KV (TUNNEL_KV という名前で作成)
+- KVキー: current_tunnel_url
+
+【GET /tunnel レスポンス】
+{
+  "url": "https://abc-123.trycloudflare.com",
+  "updatedAt": "2026-02-09T12:34:56.789Z"
+}
+
+【POST /tunnel リクエスト】
+{
+  "url": "https://abc-123.trycloudflare.com"
+}
+
+【POST /tunnel レスポンス】
+{
+  "success": true,
+  "url": "https://abc-123.trycloudflare.com",
+  "message": "URLを保存しました"
+}
+
+【CORS設定】
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type
+
+【URL検証】
+- https:// で始まり .trycloudflare.com を含む
+- または http://localhost: で始まる（開発用）
+
+【エラーハンドリング】
+- 不正なURL: 400エラー
+- KVエラー: 500エラー
+- 適切なエラーメッセージを返す
+
+【wrangler.toml】
+[[kv_namespaces]]
+binding = "TUNNEL_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+【デプロイ手順】
+1. wrangler kv:namespace create "TUNNEL_KV"
+2. 出力されたIDをwrangler.tomlに設定
+3. wrangler deploy
+
+【テスト】
+curl https://music-tunnel-api.haka01xx.workers.dev/tunnel
+curl -X POST https://music-tunnel-api.haka01xx.workers.dev/tunnel -H "Content-Type: application/json" -d '{"url":"https://test.trycloudflare.com"}'

@@ -1,0 +1,6 @@
+# Cloudflare Pages用リダイレクト設定
+
+# SPAのフォールバック（Next.jsは不要だが念のため）
+# /api/* は除外
+!/api/*
+/* /index.html 200

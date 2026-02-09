@@ -9,12 +9,11 @@ import {
   PlusCircle, 
   Heart,
   Monitor,
-  FolderOpen,
   Music,
   Upload,
   Settings,
   ListPlus,
-  Trash2
+  Play
 } from 'lucide-react';
 import { useMusicStore } from '@/lib/store';
 
@@ -31,14 +30,15 @@ export default function Sidebar({
   onSelectMusicFolder,
   musicFolder 
 }: SidebarProps) {
-  const { playlists, setPlaylists } = useMusicStore();
+  const { playlists, setPlaylists, playFromPlaylist } = useMusicStore();
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [hoveredPlaylist, setHoveredPlaylist] = useState<string | null>(null);
 
   // プレイリストを取得（初回のみ）
   useEffect(() => {
     fetchPlaylists();
-  }, []); // 空の依存配列で初回のみ実行
+  }, []);
 
   const fetchPlaylists = async () => {
     try {
@@ -93,24 +93,19 @@ export default function Sidebar({
     onViewChange(`playlist:${playlistId}`);
   };
 
-  const handleDeletePlaylist = async (playlistId: string, e: React.MouseEvent) => {
+  const handlePlaylistPlay = async (e: React.MouseEvent, playlistId: string) => {
     e.stopPropagation();
     
-    if (!confirm('このプレイリストを削除しますか？')) return;
-    
     try {
-      const response = await fetch(`/api/playlists/${playlistId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        setPlaylists(playlists.filter(p => p.id !== playlistId));
-        if (currentView === `playlist:${playlistId}`) {
-          onViewChange('home');
-        }
+      const response = await fetch(`/api/playlists/${playlistId}`);
+      const data = await response.json();
+      
+      if (data.playlist && data.playlist.tracks.length > 0) {
+        const tracks = data.playlist.tracks.map((pt: any) => pt.track);
+        playFromPlaylist(tracks, 0);
       }
     } catch (error) {
-      console.error('Failed to delete playlist:', error);
+      console.error('Failed to play playlist:', error);
     }
   };
 
@@ -154,24 +149,6 @@ export default function Sidebar({
             </button>
           ))}
         </nav>
-      </div>
-
-      {/* 音楽フォルダ選択 */}
-      <div className="px-3 py-2 border-t border-white/10 md:hidden lg:block">
-        <button
-          onClick={onSelectMusicFolder}
-          className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <FolderOpen className="w-5 h-5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="font-medium">Music Folder</div>
-            {musicFolder && (
-              <div className="text-xs text-gray-500 truncate">
-                {musicFolder}
-              </div>
-            )}
-          </div>
-        </button>
       </div>
 
       {/* サーバーメニュー */}
@@ -267,6 +244,8 @@ export default function Sidebar({
             <div
               key={playlist.id}
               className="group relative"
+              onMouseEnter={() => setHoveredPlaylist(playlist.id)}
+              onMouseLeave={() => setHoveredPlaylist(null)}
             >
               <button
                 onClick={() => handlePlaylistClick(playlist.id)}
@@ -277,18 +256,19 @@ export default function Sidebar({
                 }`}
                 title={playlist.name}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="flex items-center space-x-3">
+                  {hoveredPlaylist === playlist.id ? (
+                    <button
+                      onClick={(e) => handlePlaylistPlay(e, playlist.id)}
+                      className="w-4 h-4 flex items-center justify-center flex-shrink-0"
+                      title="プレイリストを再生"
+                    >
+                      <Play className="w-3 h-3 text-green-500 fill-green-500" />
+                    </button>
+                  ) : (
                     <ListPlus className="w-4 h-4 flex-shrink-0" />
-                    <span className="text-sm truncate md:hidden lg:inline">{playlist.name}</span>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeletePlaylist(playlist.id, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity md:hidden lg:inline-block"
-                    title="プレイリストを削除"
-                  >
-                    <Trash2 className="w-3 h-3 text-red-500" />
-                  </button>
+                  )}
+                  <span className="text-sm truncate md:hidden lg:inline">{playlist.name}</span>
                 </div>
               </button>
             </div>

@@ -40,6 +40,7 @@ interface MusicStore {
   // マルチルーム
   isSyncMode: boolean;
   connectedDevices: number;
+  serverTimeOffset: number; // サーバー時刻とのオフセット（ミリ秒）
   
   // アクション
   setCurrentTrack: (track: Track | null) => void;
@@ -60,6 +61,8 @@ interface MusicStore {
   playPrevious: () => void;
   setIsSyncMode: (sync: boolean) => void;
   setConnectedDevices: (count: number) => void;
+  setServerTimeOffset: (offset: number) => void;
+  playFromPlaylist: (playlist: Track[], startIndex: number) => void;
 }
 
 interface Playlist {
@@ -84,6 +87,7 @@ export const useMusicStore = create<MusicStore>((set) => ({
   likedSongs: [],
   isSyncMode: false,
   connectedDevices: 0,
+  serverTimeOffset: 0,
   
   // アクション
   setCurrentTrack: (track) => set({ currentTrack: track }),
@@ -144,4 +148,13 @@ export const useMusicStore = create<MusicStore>((set) => ({
   
   setIsSyncMode: (sync) => set({ isSyncMode: sync }),
   setConnectedDevices: (count) => set({ connectedDevices: count }),
+  setServerTimeOffset: (offset) => set({ serverTimeOffset: offset }),
+  
+  playFromPlaylist: (playlist, startIndex) => set({
+    currentPlaylist: playlist,
+    currentTrack: playlist[startIndex],
+    isPlaying: true,
+    progress: 0,
+    currentTime: 0
+  }),
 }));

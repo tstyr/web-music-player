@@ -218,11 +218,99 @@ app.prepare().then(async () => {
   globalIo = io;
   global.io = io; // グローバルに公開
 
+  // 接続中のデバイスを管理
+  const connectedDevices = new Map();
+
+  // デバイス情報を取得
+  function getDeviceInfo(socket) {
+    const userAgent = socket.handshake.headers['user-agent'] || '';
+    let deviceType = 'desktop';
+    let deviceName = 'Unknown Device';
+
+    if (/mobile/i.test(userAgent)) {
+      deviceType = 'mobile';
+      deviceName = 'Mobile Device';
+    } else if (/tablet|ipad/i.test(userAgent)) {
+      deviceType = 'tablet';
+      deviceName = 'Tablet';
+    } else {
+      deviceName = 'Desktop';
+    }
+
+    // より詳細なデバイス名を取得
+    if (/iPhone/i.test(userAgent)) {
+      deviceName = 'iPhone';
+    } else if (/iPad/i.test(userAgent)) {
+      deviceName = 'iPad';
+    } else if (/Android/i.test(userAgent)) {
+      deviceName = 'Android Device';
+    } else if (/Windows/i.test(userAgent)) {
+      deviceName = 'Windows PC';
+    } else if (/Mac/i.test(userAgent)) {
+      deviceName = 'Mac';
+    }
+
+    return { deviceType, deviceName };
+  }
+
+  // 全クライアントにデバイスリストをブロードキャスト
+  function broadcastDeviceList() {
+    const deviceList = Array.from(connectedDevices.values());
+    io.emit('device-list-update', {
+      devices: deviceList,
+      count: deviceList.length
+    });
+    console.log(`[Socket.io] Broadcasting device list: ${deviceList.length} devices`);
+  }
+
   io.on('connection', (socket) => {
     const clientIp = socket.handshake.headers['cf-connecting-ip'] || 
                      socket.handshake.headers['x-forwarded-for'] || 
                      socket.handshake.address;
-    console.log(`[Socket.io] Client connected: ${socket.id} (IP: ${clientIp})`);
+    
+    const { deviceType, deviceName } = getDeviceInfo(socket);
+    
+    console.log(`[Socket.io] Client connected: ${socket.id} (IP: ${clientIp}, Type: ${deviceType})`);
+
+    // デバイス情報を登録
+    connectedDevices.set(socket.id, {
+      id: socket.id,
+      name: deviceName,
+      type: deviceType,
+      ip: clientIp,
+      isActive: true,
+      connectedAt: new Date().toISOString()
+    });
+
+    // 全クライアントにデバイスリストを送信
+    broadcastDeviceList();
+
+    // クライアントにデバイスIDを送信
+    socket.emit('device-registered', {
+      deviceId: socket.id,
+      deviceName,
+      deviceType
+    });
+
+    // デバイス名の更新をリクエスト
+    socket.on('update-device-name', (data) => {
+      const device = connectedDevices.get(socket.id);
+      if (device) {
+        device.name = data.name || device.name;
+        connectedDevices.set(socket.id, device);
+        broadcastDeviceList();
+      }
+    });
+
+    // 時刻同期（クライアントがサーバー時刻とのオフセットを計算）
+    socket.on('time-sync-request', (clientTime) => {
+      const serverTime = Date.now();
+      socket.emit('time-sync-response', {
+        clientTime,
+        serverTime,
+        responseTime: Date.now()
+      });
+    });
 
     // 再生状態の同期
     socket.on('play', (data) => {
@@ -250,18 +338,45 @@ app.prepare().then(async () => {
       socket.broadcast.emit('volume-change', data);
     });
 
-    // マルチルーム同期再生
-    socket.on('sync-play', (data) => {
-      const syncTime = Date.now() + 200;
-      console.log(`[Socket.io] Sync play event from ${socket.id}`);
+    // 高精度同期再生（ミリ秒単位）
+    socket.on('sync-play-request', (data) => {
+      const { trackId, currentTime, delay = 150 } = data;
+      const serverTime = Date.now();
+      const syncTime = serverTime + delay; // デフォルト150ms後に同期再生
+      
+      console.log(`[Socket.io] Sync play request from ${socket.id}: scheduling at ${syncTime} (in ${delay}ms)`);
+      
       io.emit('sync-play-command', {
-        ...data,
-        syncTime
+        trackId,
+        currentTime,
+        syncTime,
+        serverTime
+      });
+    });
+
+    // 次の曲への同期切り替え
+    socket.on('sync-next-track', (data) => {
+      const { trackId, delay = 100 } = data;
+      const serverTime = Date.now();
+      const syncTime = serverTime + delay;
+      
+      console.log(`[Socket.io] Sync track change from ${socket.id}: ${trackId}`);
+      
+      io.emit('sync-track-change', {
+        trackId,
+        syncTime,
+        serverTime
       });
     });
 
     socket.on('disconnect', () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+      
+      // デバイスリストから削除
+      connectedDevices.delete(socket.id);
+      
+      // 全クライアントに更新を通知
+      broadcastDeviceList();
     });
   });
 

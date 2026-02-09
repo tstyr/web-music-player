@@ -92,6 +92,8 @@ model Playlist {
   name        String
   description String?
   userId      String
+  shareToken  String?        @unique // 共有用トークン（オプション）
+  isPublic    Boolean        @default(false) // 公開設定
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tracks      PlaylistTrack[]
   createdAt   DateTime       @default(now())

@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Search, Play, Pause, Heart, MoreHorizontal, Music2, Headphones, Edit2, Filter } from 'lucide-react';
 import ServerDashboard from './ServerDashboard';
 import UploadZone from './UploadZone';
-import AudioVisualizer from './AudioVisualizer';
 import EditTrackModal from './EditTrackModal';
 import TrackMenu from './TrackMenu';
 import TrackListItem from './TrackListItem';
@@ -35,14 +34,12 @@ interface Track {
 interface MainContentProps {
   onTrackSelect: (track: Track) => void;
   musicFolder: string | null;
-  analyser?: AnalyserNode | null;
   backgroundColor?: 'black' | 'gray' | 'white';
 }
 
 export default function MainContent({
   onTrackSelect,
   musicFolder,
-  analyser,
   backgroundColor = 'black'
 }: MainContentProps) {
   const {
@@ -63,6 +60,8 @@ export default function MainContent({
   const [playlistInfo, setPlaylistInfo] = useState<{ name: string; description?: string } | null>(null);
   const [trackMenuOpen, setTrackMenuOpen] = useState<string | null>(null);
   const [trackMenuPosition, setTrackMenuPosition] = useState({ x: 0, y: 0 });
+  const [playlistMenuOpen, setPlaylistMenuOpen] = useState(false);
+  const [playlistMenuPosition, setPlaylistMenuPosition] = useState({ x: 0, y: 0 });
 
   // プレイリストIDを抽出
   const playlistId = currentView.startsWith('playlist:') ? currentView.split(':')[1] : null;
@@ -313,10 +312,84 @@ export default function MainContent({
   if (playlistId || isLikedView) {
     const displayTracks = playlistTracks;
     
+    const handlePlaylistPlay = () => {
+      if (displayTracks.length > 0) {
+        setCurrentPlaylist(displayTracks);
+        onTrackSelect(displayTracks[0]);
+      }
+    };
+
+    const handleDeletePlaylist = async () => {
+      if (!playlistId) return;
+      
+      if (!confirm('このプレイリストを削除しますか？')) return;
+      
+      try {
+        const response = await fetch(`/api/playlists/${playlistId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          toast.success('プレイリストを削除しました');
+          // ホーム画面に戻る
+          window.location.href = '/';
+        }
+      } catch (error) {
+        console.error('Failed to delete playlist:', error);
+        toast.error('プレイリストの削除に失敗しました');
+      }
+    };
+
+    const handleSharePlaylist = async () => {
+      if (!playlistId) return;
+      
+      try {
+        const shareUrl = `${window.location.origin}/playlist/share/${playlistId}`;
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('共有リンクをコピーしました！');
+        setPlaylistMenuOpen(false);
+      } catch (error) {
+        console.error('Failed to copy share link:', error);
+        toast.error('リンクのコピーに失敗しました');
+      }
+    };
+
+    const handlePlaylistMenuOpen = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      setPlaylistMenuPosition({
+        x: rect.left - 200,
+        y: rect.top + rect.height
+      });
+      setPlaylistMenuOpen(true);
+    };
+    
     return (
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="p-6 glass border-b border-white/10 flex-shrink-0">
-          <h1 className="text-2xl font-bold">{playlistInfo?.name || 'Playlist'}</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold">{playlistInfo?.name || 'Playlist'}</h1>
+              {displayTracks.length > 0 && (
+                <button
+                  onClick={handlePlaylistPlay}
+                  className="w-12 h-12 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-all hover:scale-105 shadow-lg"
+                  title="プレイリストを再生"
+                >
+                  <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                </button>
+              )}
+            </div>
+            {playlistId && (
+              <button
+                onClick={handlePlaylistMenuOpen}
+                className="text-gray-400 hover:text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="プレイリストメニュー"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            )}
+          </div>
           {playlistInfo?.description && (
             <p className="text-gray-400 mt-2">{playlistInfo.description}</p>
           )}
@@ -359,18 +432,23 @@ export default function MainContent({
                     <div
                       key={track.id}
                       className="p-4 hover:bg-white/5 cursor-pointer group transition-colors"
-                      onClick={() => handleTrackClick(track)}
+                      onClick={() => {
+                        setCurrentPlaylist(displayTracks);
+                        handleTrackClick(track);
+                      }}
                     >
                       <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className={`col-span-1 ${isCurrentTrack ? 'text-green-500' : 'text-gray-400'} group-hover:hidden`}>
-                          {isTrackPlaying ? '♪' : index + 1}
-                        </div>
-                        <div className="col-span-1 hidden group-hover:block">
-                          {isTrackPlaying ? (
-                            <Pause className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <Play className="w-4 h-4 text-white" />
-                          )}
+                        <div className="col-span-1 relative">
+                          <span className={`${isCurrentTrack ? 'text-green-500' : 'text-gray-400'} group-hover:hidden`}>
+                            {isTrackPlaying ? '♪' : index + 1}
+                          </span>
+                          <button className="hidden group-hover:block absolute inset-0 flex items-center justify-center">
+                            {isTrackPlaying ? (
+                              <Pause className="w-4 h-4 text-white" />
+                            ) : (
+                              <Play className="w-4 h-4 text-white" />
+                            )}
+                          </button>
                         </div>
                         
                         <div className="col-span-4 flex items-center space-x-3">
@@ -542,35 +620,28 @@ export default function MainContent({
           <>
             {currentView === 'home' && (
               <div className="space-y-6 sm:space-y-8">
-                {/* 大きなビジュアライザー（音楽再生中のみ表示） */}
+                {/* 現在再生中の曲情報 */}
                 {currentTrack && (
                   <div className="glass rounded-xl p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
-                      <div>
-                        <h2 className="text-lg sm:text-xl font-semibold">Now Playing</h2>
-                        <p className="text-sm sm:text-base text-gray-400 truncate">{currentTrack.title} - {currentTrack.artist}</p>
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
+                        {currentTrack.artwork ? (
+                          <img 
+                            src={currentTrack.artwork} 
+                            alt={currentTrack.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center">
+                            <Music2 className="w-8 h-8 text-gray-400" />
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-400">
-                        Click visualizer for fullscreen
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-lg sm:text-xl font-semibold truncate">Now Playing</h2>
+                        <p className="text-sm sm:text-base text-gray-400 truncate">{currentTrack.title}</p>
+                        <p className="text-xs sm:text-sm text-gray-500 truncate">{currentTrack.artist}</p>
                       </div>
-                    </div>
-                    <div className={`${backgroundColor === 'white' ? 'bg-gray-100' : 'bg-black'} rounded-lg overflow-hidden`}>
-                      <AudioVisualizer
-                        isPlaying={isPlaying}
-                        analyser={analyser}
-                        className="w-full h-24 sm:h-32"
-                        barCount={128}
-                        height={128}
-                        backgroundColor={backgroundColor}
-                        currentTrack={currentTrack}
-                        onPlayPause={() => {}}
-                        progress={0}
-                        onProgressChange={() => {}}
-                        currentTime={0}
-                        duration={currentTrack.duration}
-                        volume={75}
-                        onVolumeChange={() => {}}
-                      />
                     </div>
                   </div>
                 )}
@@ -851,6 +922,52 @@ export default function MainContent({
             setTrackMenuOpen(null);
           }}
         />
+      )}
+
+      {/* プレイリストメニュー */}
+      {playlistMenuOpen && playlistId && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setPlaylistMenuOpen(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute glass-dark border border-white/20 rounded-xl shadow-2xl overflow-hidden"
+            style={{
+              left: `${playlistMenuPosition.x}px`,
+              top: `${playlistMenuPosition.y}px`,
+              minWidth: '200px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="py-2">
+              <button
+                onClick={handleSharePlaylist}
+                className="w-full px-4 py-2 text-left hover:bg-white/10 transition-colors flex items-center space-x-3"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span>共有リンクをコピー</span>
+              </button>
+              <div className="border-t border-white/10 my-1"></div>
+              <button
+                onClick={() => {
+                  setPlaylistMenuOpen(false);
+                  handleDeletePlaylist();
+                }}
+                className="w-full px-4 py-2 text-left hover:bg-white/10 transition-colors flex items-center space-x-3 text-red-400 hover:text-red-300"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>プレイリストを削除</span>
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

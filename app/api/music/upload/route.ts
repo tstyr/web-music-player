@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
         }
 
         // ファイル拡張子のチェック
-        const ext = path.extname(file.name).toLowerCase();
+        const fileExtension = path.extname(file.name).toLowerCase();
         const allowedExtensions = ['.mp3', '.flac', '.m4a', '.aac', '.ogg', '.wav', '.wma', '.dsd', '.dsf', '.dff'];
         
-        if (!allowedExtensions.includes(ext)) {
+        if (!allowedExtensions.includes(fileExtension)) {
           results.push({
             success: false,
             fileName: file.name,
@@ -62,15 +62,31 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         
-        // ファイル名をサニタイズ
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        // 日本語ファイル名を正しくデコード
+        let originalName = file.name;
+        
+        // latin1エンコーディングで文字化けしている場合の修正
+        try {
+          // ファイル名が正しくデコードされているか確認
+          if (originalName.includes('�') || /[\x80-\xFF]/.test(originalName)) {
+            // latin1からUTF-8に変換
+            originalName = Buffer.from(originalName, 'latin1').toString('utf8');
+          }
+        } catch (e) {
+          console.warn('[Upload] Filename encoding detection failed, using original name');
+        }
+        
+        // ファイル名をサニタイズ（危険な文字のみ除去、日本語は保持）
+        // Windows/Linuxで使用できない文字のみ除去: \ / : * ? " < > |
+        const sanitizedName = originalName.replace(/[\\/:*?"<>|]/g, '_');
         let filePath = path.join(UPLOAD_DIR, sanitizedName);
         
         // 同名ファイルが存在する場合はタイムスタンプを追加
         let counter = 1;
+        const fileExt = path.extname(sanitizedName);
         while (existsSync(filePath)) {
           const nameWithoutExt = path.parse(sanitizedName).name;
-          const newName = `${nameWithoutExt}_${counter}${ext}`;
+          const newName = `${nameWithoutExt}_${counter}${fileExt}`;
           filePath = path.join(UPLOAD_DIR, newName);
           counter++;
         }
@@ -80,7 +96,7 @@ export async function POST(request: NextRequest) {
         
         // メタデータを取得
         let duration = 0;
-        let title = path.basename(file.name, path.extname(file.name));
+        let title = path.basename(sanitizedName, path.extname(sanitizedName));
         let artist = 'Unknown Artist';
         let album = 'Unknown Album';
         let genre = 'Unknown';
@@ -138,12 +154,15 @@ export async function POST(request: NextRequest) {
 
           console.log(`[Upload] Metadata extracted: ${title} by ${artist}, duration: ${duration}s`);
         } catch (metadataError: any) {
-          console.warn(`[Upload] メタデータ取得エラー (${file.name}):`, metadataError.message);
+          console.warn(`[Upload] メタデータ取得エラー (${sanitizedName}):`, metadataError.message);
         }
 
         // Hi-Res判定とクオリティラベル
         const isHighRes = sampleRate > 48000;
         const quality = getQualityLabel(sampleRate, bitDepth);
+        
+        // ファイル拡張子を取得
+        const fileFormat = fileExtension.substring(1).toUpperCase();
         
         // データベースに保存
         const track = await prisma.track.create({
@@ -155,7 +174,7 @@ export async function POST(request: NextRequest) {
             filePath: filePath,
             fileName: path.basename(filePath),
             fileSize: buffer.length,
-            format: ext.substring(1).toUpperCase(),
+            format: fileFormat,
             sampleRate,
             bitDepth,
             bitrate,
@@ -172,7 +191,7 @@ export async function POST(request: NextRequest) {
         
         results.push({
           success: true,
-          fileName: file.name,
+          fileName: originalName,
           track: track,
           metadata: {
             format: track.format,
