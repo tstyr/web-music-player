@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import path from 'path';
 import fs from 'fs';
-import { parseFile } from 'music-metadata';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +106,8 @@ async function scanMusicFolder(folderPath: string): Promise<any[]> {
             let channels = 2;
 
             try {
+              // @ts-ignore - ESモジュールの動的インポート
+              const { parseFile } = await import('music-metadata');
               const metadata = await parseFile(filePath, {
                 skipCovers: false,
                 includeChapters: false
