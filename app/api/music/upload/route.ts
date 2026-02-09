@@ -4,14 +4,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
-// 100MBまでのファイルアップロードを許可
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    },
-  },
-};
+export const maxDuration = 60;
 
 import { prisma } from '@/lib/prisma';
 
