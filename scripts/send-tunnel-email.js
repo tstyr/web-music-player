@@ -7,6 +7,11 @@ const nodemailer = require('nodemailer');
  */
 async function sendTunnelEmail(tunnelUrl, recipientEmail = 'kenta4126.2201@gmail.com') {
   try {
+    console.log('📧 メール送信開始...');
+    console.log('   送信元:', process.env.EMAIL_USER);
+    console.log('   送信先:', recipientEmail);
+    console.log('   トンネルURL:', tunnelUrl);
+    
     // Gmailを使用する場合の設定
     // 注意: Gmailの場合、アプリパスワードを使用する必要があります
     // https://support.google.com/accounts/answer/185833
@@ -18,6 +23,8 @@ async function sendTunnelEmail(tunnelUrl, recipientEmail = 'kenta4126.2201@gmail
         pass: process.env.EMAIL_PASS  // Gmailアプリパスワード
       }
     });
+    
+    console.log('📤 SMTP接続確認中...');
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -71,9 +78,13 @@ async function sendTunnelEmail(tunnelUrl, recipientEmail = 'kenta4126.2201@gmail
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ メール送信成功:', info.messageId);
     console.log('   送信先:', recipientEmail);
+    console.log('   応答:', info.response);
     return true;
   } catch (error) {
-    console.error('❌ メール送信エラー:', error.message);
+    console.error('❌ メール送信エラー:');
+    console.error('   エラーメッセージ:', error.message);
+    console.error('   エラーコード:', error.code);
+    console.error('   詳細:', error);
     return false;
   }
 }
