@@ -21,7 +21,7 @@
     "dist": "npm run build && electron-builder --publish=never",
     "tunnel:setup": "cloudflared tunnel create music-player",
     "tunnel:start": "cloudflared tunnel run music-player",
-    "tunnel:auto": "node scripts/auto-tunnel.js",
+    "tunnel:auto": "node -r dotenv/config scripts/auto-tunnel.js",
     "tunnel:install": "cloudflared service install",
     "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel:start\"",
     "start:all": "concurrently --kill-others \"npm run dev\" \"npm run tunnel:auto\"",
