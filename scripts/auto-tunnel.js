@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+require('dotenv').config();
 const { spawn } = require('child_process');
 const https = require('https');
 const { sendTunnelEmail } = require('./send-tunnel-email');
