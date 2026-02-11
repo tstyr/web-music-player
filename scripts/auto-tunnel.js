@@ -2,11 +2,13 @@
 
 const { spawn } = require('child_process');
 const https = require('https');
+const { sendTunnelEmail } = require('./send-tunnel-email');
 
 // 設定
 const WORKERS_URL = 'https://music.haka01xx.workers.dev/tunnel';
 const PORT = process.env.PORT || 3000;
 const TUNNEL_URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+const RECIPIENT_EMAIL = process.env.TUNNEL_EMAIL || 'kenta4126.2201@gmail.com';
 
 // 色付きコンソール出力
 const colors = {
@@ -99,9 +101,25 @@ function startTunnel() {
         sendUrlToWorkers(tunnelUrl)
           .then(() => {
             log('✅ Workers更新成功!', colors.green);
+            
+            // メール送信
+            if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+              log('\n📧 メール送信中...', colors.yellow);
+              sendTunnelEmail(tunnelUrl, RECIPIENT_EMAIL)
+                .then(() => {
+                  log(`✅ メール送信成功: ${RECIPIENT_EMAIL}`, colors.green);
+                })
+                .catch((error) => {
+                  log(`⚠️  メール送信失敗: ${error.message}`, colors.yellow);
+                });
+            } else {
+              log('\n⚠️  メール送信スキップ (EMAIL_USER/EMAIL_PASSが未設定)', colors.yellow);
+            }
+            
             box('準備完了！トンネルが稼働中です', '🎉');
             log(`\n💡 トンネルURL: ${colors.bright}${tunnelUrl}${colors.reset}`);
             log(`💡 Workers URL: ${colors.bright}${WORKERS_URL}${colors.reset}`);
+            log(`💡 送信先メール: ${colors.bright}${RECIPIENT_EMAIL}${colors.reset}`);
             log(`\n⚠️  終了するには Ctrl+C を押してください\n`, colors.yellow);
           })
           .catch((error) => {
