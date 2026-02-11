@@ -130,9 +130,53 @@ function startTunnel() {
     }
   });
 
-  // 標準エラー出力を監視
+  // 標準エラー出力も監視（Cloudflaredはstderrにログを出力）
   tunnel.stderr.on('data', (data) => {
-    process.stderr.write(data);
+    const output = data.toString();
+    process.stderr.write(output);
+    
+    // トンネルURLを抽出（stderrからも）
+    if (!urlSent) {
+      const match = output.match(TUNNEL_URL_PATTERN);
+      if (match) {
+        const tunnelUrl = match[0];
+        urlSent = true;
+        
+        log('\n✅ トンネルURL取得成功!', colors.green);
+        log(`   URL: ${tunnelUrl}`, colors.bright);
+        
+        // WorkersにURLを送信
+        log('\n📤 WorkersにURL送信中...', colors.yellow);
+        sendUrlToWorkers(tunnelUrl)
+          .then(() => {
+            log('✅ Workers更新成功!', colors.green);
+            
+            // メール送信
+            if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+              log('\n📧 メール送信中...', colors.yellow);
+              sendTunnelEmail(tunnelUrl, RECIPIENT_EMAIL)
+                .then(() => {
+                  log(`✅ メール送信成功: ${RECIPIENT_EMAIL}`, colors.green);
+                })
+                .catch((error) => {
+                  log(`⚠️  メール送信失敗: ${error.message}`, colors.yellow);
+                });
+            } else {
+              log('\n⚠️  メール送信スキップ (EMAIL_USER/EMAIL_PASSが未設定)', colors.yellow);
+            }
+            
+            box('準備完了！トンネルが稼働中です', '🎉');
+            log(`\n💡 トンネルURL: ${colors.bright}${tunnelUrl}${colors.reset}`);
+            log(`💡 Workers URL: ${colors.bright}${WORKERS_URL}${colors.reset}`);
+            log(`💡 送信先メール: ${colors.bright}${RECIPIENT_EMAIL}${colors.reset}`);
+            log(`\n⚠️  終了するには Ctrl+C を押してください\n`, colors.yellow);
+          })
+          .catch((error) => {
+            log(`❌ Workers更新失敗: ${error.message}`, colors.red);
+            log('⚠️  トンネルは稼働していますが、URLは手動で設定してください', colors.yellow);
+          });
+      }
+    }
   });
 
   // エラーハンドリング
